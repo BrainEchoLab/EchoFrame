@@ -1,0 +1,65 @@
+echoframe/cpp/cmake-build-debug/
+
+.vscode/
+
+echoframe/cpp/.vs/
+
+echoframe/cpp/out/
+
+*.mexw64
+
+*.mexw64.dat
+
+*.mexw64.pdb
+
+*.mexa64
+
+*.asv
+
+*.h5
+
+*.mat
+
+__pycache__/
+
+.idea/
+
+build/
+build_py/
+echoframe_py_env/
+*.ini
+
+echoframe/cpp/src/_deps
+echoframe/cpp/src/CMakeFiles
+documentation/_doxygen/
+echoframe/cpp/src/build_py312
+echoframe/cpp/src/build_py312_Sb
+echoframe/cpp/src/dist
+echoframe/cpp/src/otherbuild
+echoframe/cpp/src/py3.10_wheel_build
+echoframe/cpp/src/py3.11_wheel_build
+echoframe/cpp/src/py3.12_wheel_build
+echoframe/cpp/src/tempbuild
+# Build trees from build_scripts/build_echoframe.bat. Unanchored: the script
+# writes them at the repository root by default, and EF_BUILD_ROOT can move
+# them anywhere.
+build_CUDA_*/
+echoframe/cpp/src/testing
+documentation/_build/
+
+# Test recording remnants. Unanchored: init_storage creates these wherever it is
+# pointed, and the GPU harnesses leave them under echoframe/matlab/tests/, not
+# just at the repository root.
+recording_*/
+echoframe/cpp/src/build_cli
+
+# Personal CMake preset overrides
+CMakeUserPresets.json
+
+# Claude Code local session settings
+.claude/
+
+# Working notes, not shipped with the repository.
+claude info/
+todo.md
+UBUNTU_BUILD_NOTES.md

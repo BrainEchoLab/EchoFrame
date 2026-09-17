@@ -1,0 +1,11 @@
+# Python packages needed to build the Sphinx documentation.
+#   pip install -r documentation/requirements.txt
+#
+# Doxygen itself is a separate, non-Python install:
+#   https://www.doxygen.nl/download.html
+
+sphinx>=7.0
+breathe>=4.35        # renders Doxygen's XML output into Sphinx
+myst-parser>=2.0     # lets the pages be written in Markdown
+sphinxcontrib-matlabdomain>=0.21   # the `mat:` domain conf.py loads as sphinxcontrib.matlab
+furo>=2024.1         # html theme

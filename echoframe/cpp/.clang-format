@@ -1,0 +1,25 @@
+BasedOnStyle: google
+IndentWidth: 4
+
+PointerAlignment: Right
+DerivePointerAlignment: false
+# Format includes according to
+# https://google.github.io/styleguide/cppguide.html#Names_and_Order_of_Includes
+IncludeCategories:
+  - Regex:           '^<(gsl/.*|cu.*|vector_types|math_constants)(\.h)?>'
+    Priority:        3
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '^<.*\.h>'
+    Priority:        1
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '^<.*'
+    Priority:        2
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '.*'
+    Priority:        4
+    SortPriority:    0
+    CaseSensitive:   false
+IncludeIsMainSourceRegex: '.*\.(t\.h(pp)?|cu)'

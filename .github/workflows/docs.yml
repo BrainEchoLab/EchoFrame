@@ -1,0 +1,79 @@
+name: Docs
+
+# Builds the Sphinx site exactly the way documentation/README.md describes it.
+# This is the cheap-but-high-value job: it catches missing doc dependencies,
+# broken directives, and references to code that no longer exists — the class of
+# problem that is invisible until someone tries to build the docs.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+# Keep the default token read-only, and cancel superseded runs on the same ref.
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sphinx:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Breathe renders Doxygen's XML, so Doxygen has to run first.
+      - name: Install Doxygen
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y doxygen
+
+      - name: Install doc requirements
+        run: python -m pip install --upgrade pip -r documentation/requirements.txt
+
+      - name: Doxygen (writes _doxygen/xml)
+        working-directory: documentation
+        run: doxygen Doxyfile
+
+      - name: Sphinx build
+        working-directory: documentation
+        run: |
+          set -o pipefail
+          python -m sphinx -b html . _build/html 2>&1 | tee sphinx.log
+
+      # sphinx-build exits 0 on warnings, so check the log explicitly.
+      #
+      # Two classes of message are known and deliberately tolerated:
+      #   - C++ template parse warnings from api/beamformer.md (Doxygen/Breathe
+      #     cannot parse out-of-line template members).
+      #   - one docutils "Unexpected indentation" from echoframe_setup_fkmig.m.
+      #     Fixing it means writing "Outputs::" in the docstring, which uglifies
+      #     MATLAB `help` output, so it is left as is.
+      # Anything else at ERROR/SEVERE level fails the build.
+      - name: Fail on new Sphinx errors
+        working-directory: documentation
+        run: |
+          # Match the known message, not the whole file: a different error in
+          # echoframe_setup_fkmig must still fail the build.
+          grep -E "(ERROR|SEVERE):" sphinx.log | grep -vE "echoframe_setup_fkmig.*Unexpected indentation" > unexpected.log || true
+          if [ -s unexpected.log ]; then
+            echo "::error::Sphinx reported unexpected errors:"
+            cat unexpected.log
+            exit 1
+          fi
+          echo "No unexpected Sphinx errors."
+
+      - name: Upload built site
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sphinx-html
+          path: documentation/_build/html
+          retention-days: 7

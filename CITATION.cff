@@ -1,0 +1,46 @@
+# Citation metadata. GitHub reads this and renders a "Cite this repository" button.
+#
+# REVIEW BEFORE PUBLISHING:
+#   - `authors` below is derived from the git history (commit counts) and lists names
+#     exactly as they appear there. Confirm who should be credited as an author of the
+#     software, in what order, and add ORCIDs / affiliations where you have them.
+#   - `repository-code` and `url` point at the public repository; update them once it
+#     exists.
+#   - Bump `version` and `date-released` when you tag a release.
+#   - If there is a paper to cite instead of the software, add a `preferred-citation`
+#     block and people will be pointed at that.
+cff-version: 1.2.0
+title: "EchoFrame: ultrafast GPU functional ultrasound imaging library"
+message: "If you use this software, please cite it as below."
+type: software
+abstract: >-
+  EchoFrame is a CUDA-accelerated library for real-time plane-wave ultrasound
+  imaging. It provides Fourier-domain beamforming and Power Doppler Imaging (PDI)
+  pipelines written in C++17/CUDA, with MATLAB (MEX) and Python (pybind11)
+  bindings, aimed at functional ultrasound imaging (fUSI).
+authors:
+  - family-names: Florescu
+    given-names: Stefanos
+  - family-names: Demi
+    given-names: Arber
+  - family-names: Kruizinga
+    given-names: Pieter
+  - family-names: Le Meur-Diebolt
+    given-names: Samuel
+  - family-names: Krumin
+    given-names: Michael
+  - family-names: Andela
+    given-names: Bouwe
+version: 1.0
+license: LGPL-3.0-or-later
+repository-code: "https://github.com/BrainEchoLab/EchoFrame"
+url: "https://github.com/BrainEchoLab/EchoFrame"
+keywords:
+  - functional ultrasound
+  - fUSI
+  - ultrasound imaging
+  - beamforming
+  - power doppler
+  - CUDA
+  - GPU
+  - real-time
