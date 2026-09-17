@@ -1,0 +1,4 @@
+[submodule "cpp/libs/GSL"]
+	path = echoframe/cpp/libs/GSL
+	url  = https://github.com/microsoft/GSL.git
+

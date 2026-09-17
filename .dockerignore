@@ -1,0 +1,6 @@
+# The Docker build context is the repository root, because the image copies
+# echoframe/cpp/src/vcpkg.json out of the source tree. The working tree is
+# several GB (binaries/, build_CUDA_*/, ...), so everything the image does not
+# read is excluded and the context stays at one file.
+**
+!echoframe/cpp/src/vcpkg.json

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["scikit-build-core>=0.8", "pybind11>=2.12"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "echoframe"
+version = "1.0"
+description = "Python bindings for EchoFrame CUDA ultrasound pipeline"
+authors = [{ name = "Your Name", email = "you@example.com" }]
+requires-python = ">=3.10"
+license = { text = "proprietary" }
+
+[tool.scikit-build]
+build.verbose = true
+# Persist scikit-build-core's own build tree so repeat `pip install -e .` runs are
+# incremental (Ninja only recompiles changed files) instead of reconfiguring and
+# recompiling from scratch every time. Kept in build_py/ (separate from the manual
+# CMake `build/` tree, which uses a different generator and cache variables).
+build-dir = "build_py/{wheel_tag}"
+# The wheel ships only the Python extension module. The CLI is a separate,
+# manually-configured CMake build (see echoframe/cpp/README.md) -- it is the only target
+# that needs matio / HDF5 / zlib, so leaving it out here keeps `pip install .`
+# free of vcpkg and of any machine-specific paths. Nothing below refers to a
+# location that has to exist on a particular machine.
+cmake.args = [
+  "-DEF_BUILD_PYTHON=ON",
+  "-DEF_BUILD_CLI=OFF",
+  "-DEF_BUILD_MEX=OFF",
+]

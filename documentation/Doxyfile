@@ -1,0 +1,49 @@
+ PROJECT_NAME          = "EchoFrame"
+ PROJECT_BRIEF         = "Real-Time Plane-Wave Ultrasound Beamforming & PDI Library"
+
+# List the source directories explicitly. `INPUT = ../echoframe/cpp/src` with
+# RECURSIVE = YES also swept the python venvs (echoframe_py_env, py3.*_wheel_build)
+# and dist/, which are inside src/ and are not EchoFrame code.
+ INPUT                 = ../echoframe/cpp/src/beamformer \
+                         ../echoframe/cpp/src/cuda \
+                         ../echoframe/cpp/src/echoframe_cli \
+                         ../echoframe/cpp/src/efcore \
+                         ../echoframe/cpp/src/mex \
+                         ../echoframe/cpp/src/pdi \
+                         ../echoframe/cpp/src/python
+ RECURSIVE             = YES
+ FILE_PATTERNS         = *.h *.hpp *.c *.cpp *.cuh *.cu
+ EXTENSION_MAPPING     = cu=C++ cuh=C++ c=C cpp=C++
+
+ HAVE_DOT              = YES
+ DOT_IMAGE_FORMAT      = svg
+ INTERACTIVE_SVG       = YES
+
+ CALL_GRAPH            = YES
+ CALLER_GRAPH          = NO  # explicitly OFF, no duplicates!
+ REFERENCES_RELATION   = YES
+ REFERENCED_BY_RELATION= YES
+
+ INLINE_SOURCES        = YES
+ SOURCE_BROWSER        = YES
+ VERBATIM_HEADERS      = YES
+ EXTRACT_ALL           = YES
+ EXTRACT_PRIVATE       = YES
+ EXTRACT_STATIC        = YES
+ MAX_DOT_GRAPH_DEPTH   = 0
+
+ CLANG_ASSISTED_PARSING = NO  # crucial to restore old behavior
+
+ OUTPUT_DIRECTORY      = ./_doxygen
+
+ GENERATE_HTML         = YES
+ HTML_OUTPUT           = html
+ GENERATE_TREEVIEW     = YES
+ GENERATE_LATEX        = YES         # produce LaTeX sources
+ LATEX_OUTPUT          = latex       # go into docs/_doxygen/latex
+ USE_PDFLATEX          = YES         # run pdflatex, not plain latex
+ PDF_HYPERLINKS        = YES         # hyperlinks in the PDF
+ LATEX_BATCHMODE       = NO          # stop on errors
+ LATEX_HIDE_INDICES    = NO          # include the index in the PDF
+ GENERATE_XML          = YES
+ DISABLE_INDEX         = YES
