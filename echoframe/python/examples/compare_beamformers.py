@@ -1,7 +1,8 @@
 """
 Compare EchoFrame Fourier and ffdas DAS beamformers on one stored RF frame.
 
-Requires an EchoFrame Python build configured with ``-DEF_USE_FFDAS=ON``.
+Requires an EchoFrame Python build. The DAS beamformer needs ffdas, which is
+built by default.
 Edit ``load_path`` below or pass it on the command line.
 """
 
