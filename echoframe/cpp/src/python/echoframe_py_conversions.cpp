@@ -19,6 +19,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <algorithm>
+#include <cctype>
 #include <iostream>
 
 #include "../../libs/Storage/src/storage/storage_spec.h"
@@ -73,6 +75,16 @@ static ReceiveSpec to_receive(const py::dict &d) {
     return r;
 }
 
+static BeamformerType to_beamformer_type(const py::dict &d) {
+    if (!d.contains("beamformerType")) return BeamformerType::Fourier;
+    std::string value = d["beamformerType"].cast<std::string>();
+    std::transform(value.begin(), value.end(), value.begin(), ::tolower);
+    if (value == "fourier") return BeamformerType::Fourier;
+    if (value == "das") return BeamformerType::DAS;
+    throw std::runtime_error(
+        "ReconSpec.beamformerType must be 'Fourier' or 'DAS'");
+}
+
 static ReconSpec to_recon(const py::dict &d, const ReceiveSpec &rs) {
     ReconSpec r;
     r.nz = scalar_or_first<int32_t>(d["nz"], "nz");
@@ -103,6 +115,7 @@ static ReconSpec to_recon(const py::dict &d, const ReceiveSpec &rs) {
     r.getBF = scalar_or_first<bool>(d["getBF"], "getBF");
     r.getPDI = scalar_or_first<bool>(d["getPDI"], "getPDI");
     r.cropBF = scalar_or_first<bool>(d["cropBF"], "cropBF");
+    r.beamformerType = to_beamformer_type(d);
     r.initialized = true;
     return r;
 }
@@ -137,6 +150,37 @@ static Beamform::FourierReconSpec to_fourier_spec(const py::dict &src) {
     return f;
 }
 
+static Beamform::DASReconSpec to_das_spec(const py::dict &src) {
+    Beamform::DASReconSpec d;
+    d.channelPositions = const_cast<float *>(
+        src["dasChannelPositions"].cast<py::array_t<float>>().data());
+    d.voxelPositions = const_cast<float *>(
+        src["dasVoxelPositions"].cast<py::array_t<float>>().data());
+    d.offsets = const_cast<float *>(
+        src["dasOffsets"].cast<py::array_t<float>>().data());
+    d.weights = const_cast<float *>(
+        src["dasWeights"].cast<py::array_t<float>>().data());
+    d.tgcVector =
+        const_cast<float *>(src["tgcVector"].cast<py::array_t<float>>().data());
+    d.wavenum = scalar_or_first<float>(src["dasWavenum"], "dasWavenum");
+    d.algorithm =
+        src.contains("dasAlgorithm")
+            ? scalar_or_first<int32_t>(src["dasAlgorithm"], "dasAlgorithm")
+            : 1;
+    d.computeType =
+        src.contains("dasComputeType")
+            ? scalar_or_first<int32_t>(src["dasComputeType"], "dasComputeType")
+            : 0;
+    if (src.contains("dasSourceDirections")) {
+        auto dirs = src["dasSourceDirections"].cast<py::array_t<float>>();
+        if (dirs.size() > 0) {
+            d.sourceDirections = const_cast<float *>(dirs.data());
+            d.useDirectivity = true;
+        }
+    }
+    return d;
+}
+
 static PDI::PDISpec to_pdi(const py::dict &d, const ReconSpec &rec) {
     PDI::PDISpec p;
     p.ensemble_size =
@@ -163,7 +207,11 @@ static EchoframeResources make_resources(const py::dict &recv,
     res.reconSpec = to_recon(recon, res.receiveSpec);
     res.pdiSpec = to_pdi(pdi, res.reconSpec);
 
-    res.fourierReconSpec = to_fourier_spec(recon);
+    if (res.reconSpec.beamformerType == BeamformerType::DAS) {
+        res.dasReconSpec = to_das_spec(recon);
+    } else {
+        res.fourierReconSpec = to_fourier_spec(recon);
+    }
 
     /*  disable storage for offline   */
     res.bfStorageSpec.save = false;

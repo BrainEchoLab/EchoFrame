@@ -21,6 +21,7 @@
 
 #include "../../libs/Storage/src/storage/storage_spec.h"
 #include "../pdi/pdi_spec.h"
+#include "./das/das_recon_spec.h"
 #include "./fourier_imaging/fourier_recon_spec.h"
 #include "resources.h"
 
@@ -32,7 +33,8 @@ struct EchoframeResources {
     PDI::PDISpec pdiSpec;  ///< Power Doppler Imaging specification.
     Beamform::FourierReconSpec
         fourierReconSpec;  ///< Fourier reconstruction specification.
-    Storage::StorageSpec storageSpec;  ///< General storage specification.
+    Beamform::DASReconSpec dasReconSpec;  ///< DAS reconstruction specification.
+    Storage::StorageSpec storageSpec;     ///< General storage specification.
     Storage::StorageSpec
         pdiStorageSpec;  ///< Storage specification for PDI data.
     Storage::StorageSpec

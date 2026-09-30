@@ -71,13 +71,33 @@ expectedReconSpecFields = {
     'extraVoxelsX', 'int32';
     'c0', 'single';
     'tgcVector', 'single';
-    'delayIndices', 'int32';
-    'interpolationWeights', 'single';
-    'frequencyAxis', 'single';
-    'planewaveDelays', 'single'; % Size = [TransmitSpec.nTransmissions,2]
     'xAxis', 'double';
     'zAxis', 'double'
     };
+
+if ~isfield(ReconSpec, 'beamformerType') || isempty(ReconSpec.beamformerType)
+    ReconSpec.beamformerType = 'Fourier';
+end
+expectedReconSpecFields(end+1, :) = {'beamformerType', 'char'};
+
+if strcmpi(ReconSpec.beamformerType, 'DAS')
+    expectedReconSpecFields = [expectedReconSpecFields; {
+        'dasChannelPositions', 'single';
+        'dasVoxelPositions', 'single';
+        'dasOffsets', 'single';
+        'dasWeights', 'single';
+        'dasWavenum', 'single';
+        'dasAlgorithm', 'int32';
+        'dasComputeType', 'int32'
+        }];
+else
+    expectedReconSpecFields = [expectedReconSpecFields; {
+        'delayIndices', 'int32';
+        'interpolationWeights', 'single';
+        'frequencyAxis', 'single';
+        'planewaveDelays', 'single' % Size = [TransmitSpec.nTransmissions,2]
+        }];
+end
 
 %% Expected fields for PDISpec
 expectedPDISpecFields = {
