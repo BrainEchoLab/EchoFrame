@@ -7,7 +7,8 @@ jobs := if os() == "windows" { env_var_or_default("NUMBER_OF_PROCESSORS", "4") }
 make_program := if os() == "windows" { "" } else { `command -v make` }
 matlab_root := if os() == "windows" { env_var_or_default("Matlab_ROOT_DIR", "C:/Program Files/MATLAB/R2024a") } else { `printf '%s' "${Matlab_ROOT_DIR:-$HOME/MATLAB/R2024a}"` }
 cuda_host_compiler := if os() == "windows" { "" } else { env_var_or_default("CMAKE_CUDA_HOST_COMPILER", "/usr/bin/g++") }
-cuda_architectures := env_var_or_default("CMAKE_CUDA_ARCHITECTURES", "61;75;86;89;90")
+default_cuda_architectures := if os() == "windows" { "" } else { `if nvcc --version 2>/dev/null | grep -Eq 'release 1[3-9]\.'; then printf '75;80;86;89;90;100;103;121'; else printf '61;75;86;89;90'; fi` }
+cuda_architectures := env_var_or_default("CMAKE_CUDA_ARCHITECTURES", default_cuda_architectures)
 vcpkg_root := env_var_or_default("VCPKG_ROOT", "C:/vcpkg")
 vcpkg_triplet := "x64-windows-static"
 test_img := env_var_or_default("HOME", "") / "ef_test.img"
