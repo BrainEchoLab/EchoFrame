@@ -6,12 +6,10 @@
 
 #include <cstdint>
 
+#include <ffdas.h>
+
 #include "../beamformer.h"
 #include "das_recon_spec.h"
-
-#ifdef EF_USE_FFDAS
-#include <ffdas.h>
-#endif
 
 namespace Beamform {
 
@@ -20,11 +18,9 @@ class FFDASBeamformer : public Beamformer<bfType_t> {
    private:
     DASReconSpec dasReconSpec;
 
-#ifdef EF_USE_FFDAS
     ffdas_handle_t handle{};
     ffdas_tensor_desc_t xDesc{};
     ffdas_tensor_desc_t outDesc{};
-#endif
 
     bool mInitialized{false};
 

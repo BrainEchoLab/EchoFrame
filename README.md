@@ -183,13 +183,17 @@ or:
 
 ## Quick Start<a name="quick-start"></a>
 
-### 🔧 Submodules
+### 🔧 Submodules<a name="submodules"></a>
 Before continuing, make sure that the submodules included in the project are properly initialized.
 ```bash
 # make sure you are in the EchoFrame directory
 git submodule init
 git submodule update
 ```
+The [`ffdas`](echoframe/cpp/libs/README.md) submodule is **required**: it provides the
+delay-and-sum (DAS) beamformer, which is built by default. If it is missing, CMake
+stops with an error telling you to run the command above. Only GSL and ffdas are
+needed; the rest of the build has no submodule dependencies.
 You can continue with the rest of the build instructions if you have no errors.
 Below you can find a set of commands to setup the project for both Linux and Windows.
 

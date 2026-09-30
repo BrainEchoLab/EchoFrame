@@ -16,8 +16,6 @@
 
 namespace Beamform {
 
-#ifdef EF_USE_FFDAS
-namespace {
 inline void ffdasErrchk(ffdas_error_t err) {
     if (err != FFDAS_SUCCESS) {
         throw std::runtime_error(std::string("ffdas error: ") +
@@ -25,7 +23,6 @@ inline void ffdasErrchk(ffdas_error_t err) {
     }
 }
 }  // namespace
-#endif
 
 template <typename bfType_t>
 FFDASBeamformer<bfType_t>::~FFDASBeamformer() {
@@ -34,23 +31,14 @@ FFDASBeamformer<bfType_t>::~FFDASBeamformer() {
 
 template <typename bfType_t>
 void FFDASBeamformer<bfType_t>::initialize() {
-#ifndef EF_USE_FFDAS
-    throw std::runtime_error(
-        "DAS beamforming requires configuring with -DEF_USE_FFDAS=ON.");
-#else
     static_assert(
         std::is_same_v<bfType_t, float2>,
         "ffdas beamformer currently supports complex single IQ only.");
     initGPU();
-#endif
 }
 
 template <typename bfType_t>
 void FFDASBeamformer<bfType_t>::initGPU() {
-#ifndef EF_USE_FFDAS
-    throw std::runtime_error(
-        "DAS beamforming requires configuring with -DEF_USE_FFDAS=ON.");
-#else
     const size_t nChannels = this->receiveSpec.nActiveChannels;
     const size_t nVoxels = this->reconSpec.totalSize;
     const size_t nTx = this->receiveSpec.nTX;
@@ -124,12 +112,10 @@ void FFDASBeamformer<bfType_t>::initGPU() {
                                   1};
     ffdasErrchk(ffdas_create_tensor_desc(&outDesc, 3, outDims, outStrides,
                                          FFDAS_C_32F));
-#endif
 }
 
 template <typename bfType_t>
 void FFDASBeamformer<bfType_t>::clearGPU() {
-#ifdef EF_USE_FFDAS
     if (xDesc) ffdas_destroy_tensor_desc(xDesc);
     if (outDesc) ffdas_destroy_tensor_desc(outDesc);
     if (handle) ffdas_destroy(handle);
@@ -141,15 +127,10 @@ void FFDASBeamformer<bfType_t>::clearGPU() {
     if (dasReconSpec.d_tgcVector) cudaFree(dasReconSpec.d_tgcVector);
     if (dasReconSpec.d_sourceDirections)
         cudaFree(dasReconSpec.d_sourceDirections);
-#endif
 }
 
 template <typename bfType_t>
 void FFDASBeamformer<bfType_t>::process() {
-#ifndef EF_USE_FFDAS
-    throw std::runtime_error(
-        "DAS beamforming requires configuring with -DEF_USE_FFDAS=ON.");
-#else
     constexpr int threadsPerBlock = 512;
     const int nRF = this->receiveSpec.nFastTimeSamples * this->receiveSpec.nTX *
                     this->receiveSpec.nSlowTimeSamples *
@@ -167,7 +148,6 @@ void FFDASBeamformer<bfType_t>::process() {
         this->d_BF, static_cast<ffdas_compute_type_t>(dasReconSpec.computeType),
         static_cast<ffdas_alg_t>(dasReconSpec.algorithm)));
     gpuErrchk(cudaDeviceSynchronize());
-#endif
 }
 
 }  // namespace Beamform

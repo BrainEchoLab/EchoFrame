@@ -13,9 +13,10 @@ Library.
 
 ## ffdas
 
-A submodule (`github.com/BrainEchoLab/ffdas`) providing the optional CUDA
-DAS beamformer backend. EchoFrame only builds it when configured with
-`-DEF_USE_FFDAS=ON`.
+A submodule (`github.com/BrainEchoLab/ffdas`) providing the CUDA
+DAS beamformer backend. EchoFrame always builds it, so the submodule must
+be initialised before configuring; a missing submodule is a hard CMake
+error rather than a silently reduced build.
 
 ## Storage
 
