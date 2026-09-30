@@ -22,7 +22,6 @@ inline void ffdasErrchk(ffdas_error_t err) {
                                  ffdas_error_string(err));
     }
 }
-}  // namespace
 
 template <typename bfType_t>
 FFDASBeamformer<bfType_t>::~FFDASBeamformer() {
