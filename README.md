@@ -17,7 +17,7 @@ EchoFrame delivers high‑throughput **Fourier‑domain beamforming** and **Powe
 * Real‑time performance (> 10 kFPS on RTX 40‑series)
 * Self‑contained build: CMake ≥ 3.21 (used to build the project) + a recent CUDA toolkit are all you need
 
-**Prebuilt binaries**: 
+**Prebuilt binaries**: available from [GitHub Releases](https://github.com/BrainEchoLab/EchoFrame/releases/latest).
 
 | Versions | CUDA 12.8 | CUDA 12.9 | CUDA 13.1 |
 |----------|-----------|-----------|-----------|
@@ -59,9 +59,9 @@ We offer a range of pre-built binaries for EchoFrame. This means you can simply 
 
 **⚠️ IMPORTANT:** If you do not have one of the CUDA and Matlab combinations mentioned in the **Prebuilt binaries** table in [Overview](#overview), then you may run into issues using EchoFrame with them!
 
-You can find these binaries in the `binaries` directory. There you can pick from the available builds whichever matches your CUDA and Matlab setup. Each folder in `binaries` contains a compressed `build` folder.
+Download the matching `build_CUDA_<version>_MATLAB_<version>.zip` from [GitHub Releases](https://github.com/BrainEchoLab/EchoFrame/releases/latest). Each asset contains a compressed `build` folder.
 
-Once you have the EchoFrame repository in your local machine, you can navigate to `EchoFrame\echoframe\cpp\src` and paste the **uncompressed** `build` folder inside `src`. After that, you should be good to go.
+Once you have the EchoFrame repository on your local machine, unzip the asset, navigate to `EchoFrame\echoframe\cpp\src`, and paste the **uncompressed** `build` folder inside `src`. After that, you should be good to go.
 
 You can then explore [how to use EchoFrame](#using-echoframe).
 
@@ -482,8 +482,6 @@ Each folder has its own README with the details.
 - **documentation/**: Doxygen configuration and generated output.
 
 - **build_scripts/**: developer helper scripts — the Windows build, vcpkg setup, and the build-verification harness. See [build_scripts/README.md](./build_scripts/README.md).
-
-- **binaries/**: prebuilt builds, one zip per CUDA/MATLAB combination. See [Plug and Play](#plug-play).
 
 - **docker/**: the Ubuntu/CUDA development image.
 

@@ -40,9 +40,10 @@ echoframe/cpp/src/py3.10_wheel_build
 echoframe/cpp/src/py3.11_wheel_build
 echoframe/cpp/src/py3.12_wheel_build
 echoframe/cpp/src/tempbuild
-# Build trees from build_scripts/build_echoframe.bat. Unanchored: the script
-# writes them at the repository root by default, and EF_BUILD_ROOT can move
-# them anywhere.
+# Build trees and packaged zips from build_scripts/build_echoframe.bat.
+# Unanchored build_CUDA_*: the script writes them at the repository root by
+# default, and EF_BUILD_ROOT can move them anywhere.
+/binaries/
 build_CUDA_*/
 echoframe/cpp/src/testing
 documentation/_build/

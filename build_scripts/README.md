@@ -45,7 +45,8 @@ set EF_BUILD_ROOT=C:\efb
 ```
 
 The packaged `binaries\build_<CONFIG>\build.zip` is written to the repository
-either way. Enabling long paths (`LongPathsEnabled` under
+either way. These generated zips are ignored by git; attach them to the matching
+GitHub Release instead. Enabling long paths (`LongPathsEnabled` under
 `HKLM\SYSTEM\CurrentControlSet\Control\FileSystem`, needs a reboot) or using the
 Ninja generator also works -- see the main README.
 
