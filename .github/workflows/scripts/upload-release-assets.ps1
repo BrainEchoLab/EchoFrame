@@ -1,6 +1,9 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string] $AssetDir
+    [string] $AssetDir,
+
+    # Overridable so the test suite can drive the script against a local stub.
+    [string] $ApiBaseUrl = "https://api.github.com"
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,7 +19,7 @@ $headers = @{
 
 $release = Invoke-RestMethod `
     -Headers $headers `
-    -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$env:TAG_NAME"
+    -Uri "$ApiBaseUrl/repos/$env:GITHUB_REPOSITORY/releases/tags/$env:TAG_NAME"
 $uploadUrl = $release.upload_url.Split("{")[0]
 
 foreach ($asset in $assets) {
@@ -29,11 +32,20 @@ foreach ($asset in $assets) {
     }
 
     $name = [uri]::EscapeDataString($asset.Name)
+
+    # "?" is a legal PowerShell variable-name character, so "$uploadUrl?name"
+    # parses as one (undefined) variable and yields a host-less URI. The braces
+    # force the expansion to stop at the variable.
+    $uploadUri = "${uploadUrl}?name=$name"
+    if (-not [uri]::IsWellFormedUriString($uploadUri, [System.UriKind]::Absolute)) {
+        throw "Malformed upload URI '$uploadUri' for $($asset.Name)."
+    }
+
     Invoke-RestMethod `
         -Method Post `
         -Headers $headers `
         -ContentType "application/zip" `
         -InFile $asset.FullName `
-        -Uri "$uploadUrl?name=$name" | Out-Null
+        -Uri $uploadUri | Out-Null
     Write-Host "Uploaded $($asset.Name)"
 }
