@@ -1,0 +1,208 @@
+name: Release binaries
+
+# Builds release ZIPs on GitHub-hosted runners. MATLAB comes from
+# matlab-actions/setup-matlab; CUDA comes from Jimver/cuda-toolkit. These builds
+# compile CUDA but do not run GPU tests because hosted runners have no NVIDIA GPU.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to upload assets to
+        required: true
+      overwrite:
+        description: Replace assets with the same name
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-binaries-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  VCPKG_ROOT: "C:\\vcpkg"
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        cuda:
+          - { label: "12.8", version: "12.8.1", arch: "61;75;86;89;90" }
+          - { label: "12.9", version: "12.9.1", arch: "61;75;86;89;90" }
+          - { label: "13.1", version: "13.1.0", arch: "75;80;86;89;90;100;103;121" }
+        matlab:
+          - { label: "2022a", release: "R2022a", cmake: "9.12" }
+          - { label: "2024a", release: "R2024a", cmake: "24.1" }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up CUDA
+        uses: Jimver/cuda-toolkit@v0.2.36
+        with:
+          cuda: ${{ matrix.cuda.version }}
+          log-file-suffix: windows-${{ matrix.cuda.label }}-${{ matrix.matlab.label }}
+
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v3
+        with:
+          release: ${{ matrix.matlab.release }}
+
+      - name: Set MATLAB root
+        shell: pwsh
+        run: |
+          $matlabExe = (Get-Command matlab).Source
+          $matlabRoot = Split-Path (Split-Path $matlabExe -Parent) -Parent
+          "Matlab_ROOT_DIR=$matlabRoot" >> $env:GITHUB_ENV
+
+      - name: Set up vcpkg
+        shell: pwsh
+        run: .\build_scripts\setup_vcpkg.ps1
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          $args = @(
+            "-S", "echoframe/cpp/src",
+            "-B", "build",
+            "-G", "Visual Studio 17 2022",
+            "-A", "x64",
+            "-T", "cuda=$env:CUDA_PATH",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake",
+            "-DVCPKG_TARGET_TRIPLET=x64-windows-static-md",
+            "-DCMAKE_PREFIX_PATH=$env:VCPKG_ROOT/installed/x64-windows-static-md",
+            "-DCMAKE_CUDA_ARCHITECTURES=${{ matrix.cuda.arch }}",
+            "-DCUDAToolkit_ROOT=$env:CUDA_PATH",
+            "-DMatlab_ROOT_DIR=$env:Matlab_ROOT_DIR",
+            "-DMATLAB_VERSION=${{ matrix.matlab.cmake }}",
+            "-DEF_BUILD_CLI=ON",
+            "-DEF_BUILD_MEX=ON",
+            "-DEF_BUILD_PYTHON=ON",
+            "-DPython_ROOT_DIR=$env:pythonLocation",
+            "-DPython_EXECUTABLE=$env:pythonLocation/python.exe",
+            "-DPython_FIND_STRATEGY=LOCATION"
+          )
+          cmake @args
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build --config Release -j $env:NUMBER_OF_PROCESSORS
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release-assets | Out-Null
+          $name = "build_CUDA_${{ matrix.cuda.label }}_MATLAB_${{ matrix.matlab.label }}"
+          pwsh -NoProfile -ExecutionPolicy Bypass -File build_scripts/pack_build.ps1 `
+            -ReleaseDir build/Release -Out "release-assets/$name.zip"
+
+      - name: Upload release asset
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.event.release.tag_name || inputs.tag }}
+          OVERWRITE: ${{ inputs.overwrite || false }}
+        run: .github/workflows/scripts/upload-release-assets.ps1 release-assets
+
+  linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+    strategy:
+      fail-fast: false
+      matrix:
+        cuda:
+          - { label: "12.8", version: "12.8.1", arch: "61;75;86;89;90" }
+          - { label: "12.9", version: "12.9.1", arch: "61;75;86;89;90" }
+          - { label: "13.1", version: "13.1.0", arch: "75;80;86;89;90;100;103;121" }
+        matlab:
+          - { label: "2022a", release: "R2022a" }
+          - { label: "2024a", release: "R2024a" }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y build-essential cmake ninja-build zip curl unzip tar pkg-config
+
+      - name: Set up CUDA
+        uses: Jimver/cuda-toolkit@v0.2.36
+        with:
+          cuda: ${{ matrix.cuda.version }}
+          log-file-suffix: linux-${{ matrix.cuda.label }}-${{ matrix.matlab.label }}
+
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v3
+        with:
+          release: ${{ matrix.matlab.release }}
+
+      - name: Set MATLAB root
+        run: |
+          matlab_bin="$(command -v matlab)"
+          echo "Matlab_ROOT_DIR=$(dirname "$(dirname "$matlab_bin")")" >> "$GITHUB_ENV"
+
+      - name: Set up vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$VCPKG_ROOT"
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+
+      - name: Configure
+        run: |
+          cmake -S echoframe/cpp/src -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DCMAKE_CUDA_ARCHITECTURES="${{ matrix.cuda.arch }}" \
+            -DCUDAToolkit_ROOT="$CUDA_PATH" \
+            -DMatlab_ROOT_DIR="$Matlab_ROOT_DIR" \
+            -DEF_BUILD_CLI=ON \
+            -DEF_BUILD_MEX=ON \
+            -DEF_BUILD_PYTHON=ON \
+            -DPython_EXECUTABLE="$pythonLocation/bin/python" \
+            -DPython_FIND_STRATEGY=LOCATION \
+            -DCMAKE_CUDA_HOST_COMPILER=/usr/bin/g++
+
+      - name: Build
+        run: cmake --build build -j "$(nproc)"
+
+      - name: Package
+        run: |
+          name="build_linux_CUDA_${{ matrix.cuda.label }}_MATLAB_${{ matrix.matlab.label }}"
+          mkdir -p "stage/build/Release" release-assets
+          find build -maxdepth 2 -type f \( \
+            -name 'echoframe_mex.mexa64' -o \
+            -name 'storage.mexa64' -o \
+            -name 'echoframe*.so' -o \
+            -name 'echoframe_cli' \
+          \) -exec cp {} stage/build/Release/ \;
+          test "$(find stage/build/Release -type f | wc -l)" -gt 0
+          (cd stage && zip -r "../release-assets/$name.zip" build)
+
+      - name: Upload release asset
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.event.release.tag_name || inputs.tag }}
+          OVERWRITE: ${{ inputs.overwrite || false }}
+        run: .github/workflows/scripts/upload-release-assets.ps1 release-assets
