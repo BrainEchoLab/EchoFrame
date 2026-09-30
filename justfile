@@ -7,8 +7,14 @@ jobs := if os() == "windows" { env_var_or_default("NUMBER_OF_PROCESSORS", "4") }
 make_program := if os() == "windows" { "" } else { `command -v make` }
 matlab_root := if os() == "windows" { env_var_or_default("Matlab_ROOT_DIR", "C:/Program Files/MATLAB/R2024a") } else { `printf '%s' "${Matlab_ROOT_DIR:-$HOME/MATLAB/R2024a}"` }
 cuda_host_compiler := if os() == "windows" { "" } else { env_var_or_default("CMAKE_CUDA_HOST_COMPILER", "/usr/bin/g++") }
-default_cuda_architectures := if os() == "windows" { "" } else { `if nvcc --version 2>/dev/null | grep -Eq 'release 1[3-9]\.'; then printf '75;80;86;89;90;100;103;121'; else printf '61;75;86;89;90'; fi` }
+default_cuda_architectures := if os() == "windows" { "" } else { `if nvcc --version 2>/dev/null | grep -Eq 'release 1[3-9]\.'; then printf '75;80;86;89;90;100;103;120;121'; elif nvcc --version 2>/dev/null | grep -Eq 'release 12\.[89]'; then printf '61;75;86;89;90;120'; else printf '61;75;86;89;90'; fi` }
 cuda_architectures := env_var_or_default("CMAKE_CUDA_ARCHITECTURES", default_cuda_architectures)
+# Component toggles, named after the CMake options they forward. The CLI is
+# opt-in because it pulls Matio, HDF5 and ZLIB through vcpkg, which not every
+# build host has.
+build_cli := env_var_or_default("EF_BUILD_CLI", "OFF")
+build_mex := env_var_or_default("EF_BUILD_MEX", "ON")
+build_python := env_var_or_default("EF_BUILD_PYTHON", "ON")
 vcpkg_root := env_var_or_default("VCPKG_ROOT", "C:/vcpkg")
 vcpkg_triplet := "x64-windows-static"
 test_img := env_var_or_default("HOME", "") / "ef_test.img"
@@ -21,20 +27,16 @@ help:
 # Configure and build.
 all: configure build
 
-# Configure the CMake build (Unix Makefiles on Linux/macOS, Visual Studio 2022 on Windows).
+# Configure the build (delegates to build_echoframe.sh on Linux/macOS).
 [unix]
 configure:
-    # Set CUDA archs up front; EchoFrame's CMakeLists sets them too late for
-    # CMake's initial CUDA compiler checks.
-    cmake -S {{source_dir}} -B {{build_dir}} \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_MAKE_PROGRAM={{make_program}} \
-        -DCMAKE_CUDA_HOST_COMPILER={{cuda_host_compiler}} \
-        -DCMAKE_CUDA_ARCHITECTURES="{{cuda_architectures}}" \
-        -DEF_BUILD_CLI=ON \
-        -DEF_BUILD_MEX=ON \
-        -DEF_BUILD_PYTHON=ON \
-        -DMatlab_ROOT_DIR="{{matlab_root}}"
+    #!/usr/bin/env bash
+    set -euo pipefail
+    flags=(--configure-only --build-dir "{{build_dir}}")
+    [ "{{build_mex}}" = "ON" ] || flags+=(--no-mex)
+    [ "{{build_python}}" = "ON" ] || flags+=(--no-python)
+    [ "{{build_cli}}" = "OFF" ] || flags+=(--cli)
+    "{{justfile_directory()}}/build_scripts/build_echoframe.sh" "${flags[@]}"
 
 [windows]
 configure:
@@ -42,8 +44,27 @@ configure:
     # with $VCPKG_ROOT if it's not at C:/vcpkg.
     cmake -S {{source_dir}} -B {{build_dir}} -G "Visual Studio 17 2022" -A x64 \
         -DCMAKE_BUILD_TYPE=Release \
+        -DEF_BUILD_CLI={{build_cli}} \
+        -DEF_BUILD_MEX={{build_mex}} \
+        -DEF_BUILD_PYTHON={{build_python}} \
         -DCMAKE_TOOLCHAIN_FILE="{{vcpkg_root}}/scripts/buildsystems/vcpkg.cmake" \
-        -DCMAKE_PREFIX_PATH="{{vcpkg_root}}/installed/{{vcpkg_triplet}}"
+        -DCMAKE_PREFIX_PATH="{{vcpkg_root}}/installed/{{vcpkg_triplet}}" \
+        -DMatlab_ROOT_DIR="{{matlab_root}}"
+
+# List the build artefacts, with sizes.
+[unix]
+report:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    found=0
+    while IFS= read -r artefact; do
+        printf '%s  (%s)\n' "$(basename "$artefact")" "$(du -h "$artefact" | cut -f1)"
+        found=1
+    done < <(find "{{build_dir}}" -maxdepth 2 \
+        \( -name 'echoframe_mex.mexa64' -o -name 'storage.mexa64' \
+           -o -name 'echoframe*.so' -o -name 'echoframe*.pyd' \
+           -o -name 'echoframe_cli' \) -type f 2>/dev/null)
+    [ "$found" = "1" ] || echo "(no artefacts matched -- check the build log)"
 
 # Build all targets.
 [unix]
