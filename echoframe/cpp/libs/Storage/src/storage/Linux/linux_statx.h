@@ -91,17 +91,12 @@ struct DioAlignment {
 ///
 /// A kernel that does not report STATX_DIOALIGN at all -- before Linux 6.1, or
 /// a filesystem that does not implement the query -- yields `reported == false`
-/// and a conservative alignment: stx_blksize as the sector size when the
-/// kernel reported it, else the page size, and the page size for the buffer
-/// address. The page size is a multiple of every sector size such a
-/// filesystem uses, so a buffer aligned to it satisfies any of them.
+/// and a conservative page-sized alignment for both the file offset/length and
+/// the buffer address.
 inline DioAlignment resolveDioAlignment(const EfStatx &stx) {
     if (!(stx.stx_mask & kEfStatxDioalign)) {
-        const uint64_t fallback =
-            (stx.stx_mask & kEfStatxBasicStats) && stx.stx_blksize > 0
-                ? stx.stx_blksize
-                : pageSize();
-        return {fallback, pageSize(), false};
+        const uint64_t fallback = pageSize();
+        return {fallback, fallback, false};
     }
 
     if (stx.stx_dio_offset_align == 0 || stx.stx_dio_mem_align == 0)

@@ -103,21 +103,21 @@ int main() {
         expect("tmpfs: mem align is 0", a.memAlign, 0);
     }
 
-    // The regression: no STATX_DIOALIGN, but a block size is available.
+    // The regression: no STATX_DIOALIGN falls back to the page size even when
+    // a smaller block size is available.
     {
         EfStatx stx{};
         stx.stx_mask = kEfStatxBasicStats;
         stx.stx_blksize = 512;
         const auto a = resolveDioAlignment(stx);
         expectTrue("no STATX_DIOALIGN: not reported", !a.reported);
-        expect("no STATX_DIOALIGN: sector size is the block size", a.sectorSize,
-               512);
-        expectTrue("no STATX_DIOALIGN: mem align covers the block size",
-                   a.memAlign >= a.sectorSize);
+        expect("no STATX_DIOALIGN: sector size is the page size", a.sectorSize,
+               page);
+        expect("no STATX_DIOALIGN: mem align is the page size", a.memAlign,
+               page);
     }
 
-    // The regression with nothing to go on at all: the page size, which is a
-    // multiple of every sector size these filesystems use.
+    // The regression with nothing to go on at all: the page size is still used.
     {
         EfStatx stx{};
         stx.stx_mask = kEfStatxBasicStats;
