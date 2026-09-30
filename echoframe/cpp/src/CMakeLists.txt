@@ -65,6 +65,10 @@ project(EchoFrame VERSION 1.0 LANGUAGES CXX CUDA)
 # find_package(matio MODULE ...) below.
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules")
 
+# Keeps the fallback ffdas build from exporting its statically linked C++ runtime
+# (see cmake/ffdas_exports.map for what goes wrong when it does).
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/ffdas_exports.cmake")
+
 
 # --------------------------------------------------------------------------
 # Global compile/architectures options
@@ -129,38 +133,42 @@ set(EF_FFDAS_CUDA_ARCHITECTURES "" CACHE STRING
 find_package(ffdas CONFIG QUIET)
 if(NOT TARGET ffdas::ffdas AND NOT TARGET ffdas)
     set(EF_FFDAS_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/../libs/ffdas")
-    if(EXISTS "${EF_FFDAS_SOURCE}/CMakeLists.txt")
-        if(CMAKE_VERSION VERSION_LESS 3.26)
-            message(FATAL_ERROR
-                "Building the ffdas submodule needs CMake >= 3.26. Update the dev image or install CMake from PyPI/Kitware.")
-        endif()
-        set(EF_SAVED_CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}")
-        set(EF_SAVED_CUDA_SEPARABLE_COMPILATION
-            "${CMAKE_CUDA_SEPARABLE_COMPILATION}")
-        if(NOT EF_FFDAS_CUDA_ARCHITECTURES)
-            if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 13)
-                set(EF_FFDAS_CUDA_ARCHITECTURES "80;86;89;90;100;103;120;121")
-            else()
-                set(EF_FFDAS_CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}")
-            endif()
-        endif()
-        set(CMAKE_CUDA_ARCHITECTURES "${EF_FFDAS_CUDA_ARCHITECTURES}")
-        set(CMAKE_CUDA_SEPARABLE_COMPILATION OFF)
-        add_subdirectory("${EF_FFDAS_SOURCE}" "${CMAKE_BINARY_DIR}/ffdas")
-        if(TARGET ffdas)
-            set_property(TARGET ffdas PROPERTY
-                CUDA_SEPARABLE_COMPILATION OFF)
-        endif()
-        set(CMAKE_CUDA_ARCHITECTURES "${EF_SAVED_CUDA_ARCHITECTURES}")
-        set(CMAKE_CUDA_SEPARABLE_COMPILATION
-            "${EF_SAVED_CUDA_SEPARABLE_COMPILATION}")
-    else()
+    if(NOT EXISTS "${EF_FFDAS_SOURCE}/CMakeLists.txt")
         message(FATAL_ERROR
             "The ffdas-backed DAS beamformer needs an installed ffdas package or the submodule at ${EF_FFDAS_SOURCE}. Run: git submodule update --init echoframe/cpp/libs/ffdas")
     endif()
+    if(CMAKE_VERSION VERSION_LESS 3.26)
+        message(FATAL_ERROR
+            "Building the ffdas submodule needs CMake >= 3.26. Update the dev image or install CMake from PyPI/Kitware.")
+    endif()
+    set(EF_SAVED_CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}")
+    set(EF_SAVED_CUDA_SEPARABLE_COMPILATION
+        "${CMAKE_CUDA_SEPARABLE_COMPILATION}")
+    if(NOT EF_FFDAS_CUDA_ARCHITECTURES)
+        if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 13)
+            set(EF_FFDAS_CUDA_ARCHITECTURES "80;86;89;90;100;103;120;121")
+        else()
+            set(EF_FFDAS_CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}")
+        endif()
+    endif()
+    set(CMAKE_CUDA_ARCHITECTURES "${EF_FFDAS_CUDA_ARCHITECTURES}")
+    set(CMAKE_CUDA_SEPARABLE_COMPILATION OFF)
+    add_subdirectory("${EF_FFDAS_SOURCE}" "${CMAKE_BINARY_DIR}/ffdas")
+    if(TARGET ffdas)
+        set_property(TARGET ffdas PROPERTY
+            CUDA_SEPARABLE_COMPILATION OFF)
+        efconfine_ffdas_exports(ffdas)
+    endif()
+    set(CMAKE_CUDA_ARCHITECTURES "${EF_SAVED_CUDA_ARCHITECTURES}")
+    set(CMAKE_CUDA_SEPARABLE_COMPILATION
+        "${EF_SAVED_CUDA_SEPARABLE_COMPILATION}")
 endif()
 if(TARGET ffdas::ffdas)
     set(EF_FFDAS_TARGET ffdas::ffdas)
+    # A prebuilt ffdas was linked before this project could reach it, so the
+    # version script cannot be added here. Check what it exports instead of
+    # leaving the banner truncation to be diagnosed from a Python session.
+    efreport_ffdas_exports(ffdas::ffdas)
 else()
     set(EF_FFDAS_TARGET ffdas)
 endif()
