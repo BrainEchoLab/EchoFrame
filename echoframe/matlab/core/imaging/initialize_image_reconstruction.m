@@ -73,7 +73,8 @@ end
 
 nElementRf                   = double(ReceiveSpec.nChannels);
 ReconSpec.xAxis              = linspace(-(nElementRf/2)*ProbeSpec.pitch, (nElementRf/2)*ProbeSpec.pitch, Nx) * 1e3;
-ReconSpec.zAxis              = linspace(ReceiveSpec.startDepthMm,ReceiveSpec.startDepthMm + ReceiveSpec.actualEndDepthMm, Nz);
+% actualEndDepthMm is absolute (includes startDepthMm), not a span.
+ReconSpec.zAxis              = linspace(ReceiveSpec.startDepthMm, ReceiveSpec.actualEndDepthMm, Nz);
 ReconSpec.imageSize           = [Nz Nx];
 
 if strcmpi(ReconSpec.beamformerType, 'DAS')

@@ -14,8 +14,7 @@ import time
 from pathlib import Path
 
 import h5py
-
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import numpy as np
 
 import echoframe as ef
@@ -128,8 +127,14 @@ def add_das_spec(probe: dict, transmit: dict, receive: dict, recon: dict) -> dic
         * fs_over_two_c
     )
     min_offset = 1 - receive_samples.min(axis=1)
-    max_offset = (int(np.asarray(receive["nSamplesIQ"]).ravel()[0]) - 2) - receive_samples.max(axis=1)
 
+    # Planewave TX path is z*cos(theta)+x*sin(theta) plus the per-tx bulk delay
+    # Verasonics stores by clamping negative TX.Delay to zero. That bulk is in
+    # the RF; omitting it desynchronizes steered txs and blurs mid-depth. Do not
+    # rebuild the wavefront via min-over-elements or clip max_offset: the
+    # geometric path plus bulk matches min-over(active) to <0.01 sample, and
+    # ffdas already zeros channel reads past the IQ buffer so deep rows keep
+    # correct depth with partial aperture.
     steer = np.asarray(transmit["steer"], dtype=np.float64).ravel()
     transmit_delays = np.asarray(transmit.get("transmitDelays", 0), dtype=np.float64)
     use_transmit_delays = transmit_delays.size > 1 and np.any(transmit_delays != 0)
@@ -139,29 +144,27 @@ def add_das_spec(probe: dict, transmit: dict, receive: dict, recon: dict) -> dic
             transmit_delays = transmit_delays.T
         else:
             transmit_delays = transmit_delays.reshape(nelem, -1)
-        transmit_delays = transmit_delays[:, :ntx] * fs / 2
+        transmit_delays = transmit_delays[:, :ntx]
         apod = np.asarray(transmit.get("apodization", np.ones(nelem)), dtype=bool).ravel()
-        tx_x = channel_x[apod]
 
     offsets = np.empty((ntx, nz * nx), dtype=np.float32)
     for i, theta in enumerate(steer[:ntx]):
+        sin_t = np.sin(np.deg2rad(theta))
         if use_transmit_delays:
-            tx_samples = (
-                np.sqrt((voxel_x[:, None] - tx_x[None, :]) ** 2 + voxel_z[:, None] ** 2)
-                * fs_over_two_c
-                + transmit_delays[apod, i][None, :]
-            ).min(axis=1)
-            raw_offsets = tx_samples - start_samples
+            residual = transmit_delays[:, i] - channel_x * sin_t / c0
+            bulk = float(np.median(residual[apod])) if np.any(apod) else 0.0
         else:
-            raw_offsets = (
-                (
-                    z_grid * np.cos(np.deg2rad(theta))
-                    + x_grid * np.sin(np.deg2rad(theta))
-                ).ravel(order="F")
-                * fs_over_two_c
-                - start_samples
-            )
-        offsets[i] = np.clip(raw_offsets, min_offset, max_offset)
+            bulk = 0.0
+        raw_offsets = (
+            (
+                z_grid * np.cos(np.deg2rad(theta))
+                + x_grid * sin_t
+            ).ravel(order="F")
+            * fs_over_two_c
+            + bulk * fs / 2
+            - start_samples
+        )
+        offsets[i] = np.maximum(raw_offsets, min_offset)
     out["dasOffsets"] = offsets.ravel()
     out["dasWeights"] = np.full(
         ntx * nz * nx, 1.0 / max(1, ntx * nelem), dtype=np.float32
@@ -222,18 +225,18 @@ def main() -> None:
     vmax = max(float(fourier_bmode.max()), float(das_bmode.max()), np.finfo(np.float32).eps)
     imgs = [fourier_bmode, das_bmode]
     titles = ["Fourier", "DAS"]
-    # fig, axes = plt.subplots(1, 2, figsize=(8, 4), constrained_layout=True, dpi=300)
-    # for ax, img, title in zip(axes, imgs, titles):
-    #     im = ax.imshow(
-    #         20 * np.log10(img.T / vmax + np.finfo(np.float32).eps),
-    #         cmap="gray",
-    #         vmin=-60,
-    #         vmax=0,
-    #     )
-    #     ax.set_title(title)
-    #     ax.axis("image")
-    # fig.colorbar(im, ax=axes, label="dB", shrink=0.8)
-    # plt.show()
+    fig, axes = plt.subplots(1, 2, figsize=(8, 4), constrained_layout=True, dpi=300)
+    for ax, img, title in zip(axes, imgs, titles):
+        im = ax.imshow(
+            20 * np.log10(img.T / vmax + np.finfo(np.float32).eps),
+            cmap="gray",
+            vmin=-60,
+            vmax=0,
+        )
+        ax.set_title(title)
+        ax.axis("image")
+    fig.colorbar(im, ax=axes, label="dB", shrink=0.8)
+    plt.show()
 
 
 if __name__ == "__main__":

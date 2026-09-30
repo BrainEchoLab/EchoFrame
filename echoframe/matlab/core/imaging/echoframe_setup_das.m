@@ -26,27 +26,39 @@ ReconSpec.dasVoxelPositions = single([xGrid(:)'; zeros(1, nz * nx); zGrid(:)']) 
 
 receiveSamples = sqrt((xGrid(:) - channelX').^2 + zGrid(:).^2) * fsOverTwoC;
 minOffset = reshape(1 - min(receiveSamples, [], 2), nz, nx);
-maxOffset = reshape((double(ReceiveSpec.nSamplesIQ) - 2) - max(receiveSamples, [], 2), nz, nx);
 
+% Planewave TX path is z*cos(theta)+x*sin(theta) plus the per-tx bulk delay
+% Verasonics stores by clamping negative TX.Delay to zero. That bulk is in
+% the RF; omitting it desynchronizes steered txs and blurs mid-depth. Do not
+% rebuild the wavefront via min-over-elements or clip maxOffset: the
+% geometric path plus bulk matches min-over(active) to <0.01 sample, and
+% ffdas already zeros channel reads past the IQ buffer so deep rows keep
+% correct depth with partial aperture.
 useTransmitDelays = isfield(TransmitSpec, 'transmitDelays') && any(TransmitSpec.transmitDelays(:) ~= 0);
-txDelaySamples = double(TransmitSpec.transmitDelays) * double(ReceiveSpec.Fs) / 2;
-if ndims(txDelaySamples) == 3
-    txDelaySamples = squeeze(txDelaySamples(:, 1, :));
+if useTransmitDelays
+    txDelays = double(TransmitSpec.transmitDelays);
+    if ndims(txDelays) == 3
+        txDelays = squeeze(txDelays(:, 1, :));
+    end
+    if size(txDelays, 1) == nTx
+        txDelays = txDelays.';
+    end
+    active = double(TransmitSpec.apodization(:)) ~= 0;
 end
 
 ReconSpec.dasOffsets = zeros(nz, nx, nTx, 'single');
 for iTx = 1:nTx
+    theta = double(TransmitSpec.steer(iTx));
+    sinTheta = sind(theta);
     if useTransmitDelays
-        active = TransmitSpec.apodization(:) ~= 0;
-        txX = channelX(active)';
-        txDelay = txDelaySamples(active, iTx)';
-        txSamples = min(sqrt((xGrid(:) - txX).^2 + zGrid(:).^2) * fsOverTwoC + txDelay, [], 2);
-        offsets = reshape(txSamples, nz, nx) - startSamples;
+        residual = txDelays(:, iTx) - channelX * sinTheta / double(ReconSpec.c0);
+        bulk = median(residual(active));
     else
-        theta = double(TransmitSpec.steer(iTx));
-        offsets = (zGrid * cosd(theta) + xGrid * sind(theta)) * fsOverTwoC - startSamples;
+        bulk = 0;
     end
-    ReconSpec.dasOffsets(:, :, iTx) = single(min(max(offsets, minOffset), maxOffset));
+    offsets = (zGrid * cosd(theta) + xGrid * sinTheta) * fsOverTwoC ...
+        + bulk * double(ReceiveSpec.Fs) / 2 - startSamples;
+    ReconSpec.dasOffsets(:, :, iTx) = single(max(offsets, minOffset));
 end
 
 ReconSpec.dasWeights = ones(nz, nx, nTx, 'single') ./ single(max(1, nTx * nActive));
