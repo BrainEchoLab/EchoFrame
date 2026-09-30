@@ -2,3 +2,6 @@
 	path = echoframe/cpp/libs/GSL
 	url  = https://github.com/microsoft/GSL.git
 
+[submodule "echoframe/cpp/libs/ffdas"]
+	path = echoframe/cpp/libs/ffdas
+	url = https://github.com/BrainEchoLab/ffdas.git

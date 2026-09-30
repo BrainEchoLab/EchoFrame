@@ -11,16 +11,21 @@ across the core for safer array views and pointer contracts. Header-only.
 Note: this is Microsoft's **Guidelines** Support Library, not the GNU Scientific
 Library.
 
+## ffdas
+
+A submodule (`github.com/BrainEchoLab/ffdas`) providing the optional CUDA
+DAS beamformer backend. EchoFrame only builds it when configured with
+`-DEF_USE_FFDAS=ON`.
+
 ## Storage
 
 An in-tree library (`Storage/`, not a submodule) that manages writing and reading
 real-time RF, BF and PDI data to disk.
 
-## Updating the GSL submodule
+## Updating submodules
 
-GSL is the only submodule here (Storage is a plain in-tree directory). To
-initialise or update it from the repository root:
+To initialise or update external submodules from the repository root:
 
 ```bash
-git submodule update --init echoframe/cpp/libs/GSL
+git submodule update --init echoframe/cpp/libs/GSL echoframe/cpp/libs/ffdas
 ```

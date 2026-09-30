@@ -93,7 +93,8 @@ void convertMexResourcesWithStorage(const mxArray *prhs[], int nrhs,
  * REINIT_INPUT_RFSTORE_POS, and RF storage is disabled without it.
  * @param res Reference to the native EchoframeResources structure to update.
  */
-void convertReinitStorage(const mxArray *prhs[], int nrhs, EchoframeResources &res);
+void convertReinitStorage(const mxArray *prhs[], int nrhs,
+                          EchoframeResources &res);
 
 /**
  * @brief Converts MATLAB input arrays for re-initializing experiment resources.
@@ -102,7 +103,8 @@ void convertReinitStorage(const mxArray *prhs[], int nrhs, EchoframeResources &r
  * REINIT_INPUT_RFSTORE_POS, and RF storage is disabled without it.
  * @param res Reference to the native EchoframeResources structure to update.
  */
-void convertReinitExperiment(const mxArray *prhs[], int nrhs, EchoframeResources &res);
+void convertReinitExperiment(const mxArray *prhs[], int nrhs,
+                             EchoframeResources &res);
 
 /**
  * @brief Validates the fields and types of a MATLAB ReceiveSpec struct.
@@ -175,6 +177,11 @@ void validateFourierReconStruct(const mxArray *s);
  */
 void convertFourierReconSpecStructs(
     Beamform::FourierReconSpec &fourierReconSpec, const mxArray *reconStruct);
+
+void validateDASReconStruct(const mxArray *s);
+
+void convertDASReconSpecStructs(Beamform::DASReconSpec &dasReconSpec,
+                                const mxArray *reconStruct);
 
 /**
  * @brief Validates the fields and types of a MATLAB StorageSpec struct.

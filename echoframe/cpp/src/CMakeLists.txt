@@ -116,6 +116,50 @@ option(EF_BUILD_MEX "Build the MATLAB MEX interface" ON)
 option(EF_BUILD_PYTHON "Build the Python extension module" ON)
 
 option(ENABLE_CUDA_TIMING "Enable CUDA kernel timing instrumentation" OFF)
+option(EF_USE_FFDAS "Build the ffdas-backed DAS beamformer" OFF)
+set(EF_FFDAS_CUDA_ARCHITECTURES "" CACHE STRING
+    "CUDA architectures for the ffdas submodule fallback build")
+
+if(EF_USE_FFDAS)
+    find_package(ffdas CONFIG QUIET)
+    if(NOT TARGET ffdas::ffdas AND NOT TARGET ffdas)
+        set(EF_FFDAS_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/../libs/ffdas")
+        if(EXISTS "${EF_FFDAS_SOURCE}/CMakeLists.txt")
+            if(CMAKE_VERSION VERSION_LESS 3.26)
+                message(FATAL_ERROR
+                    "EF_USE_FFDAS=ON needs CMake >= 3.26 to build the ffdas submodule. Update the dev image or install CMake from PyPI/Kitware.")
+            endif()
+            set(EF_SAVED_CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}")
+            set(EF_SAVED_CUDA_SEPARABLE_COMPILATION
+                "${CMAKE_CUDA_SEPARABLE_COMPILATION}")
+            if(NOT EF_FFDAS_CUDA_ARCHITECTURES)
+                if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 13)
+                    set(EF_FFDAS_CUDA_ARCHITECTURES "80;86;89;90;100;103;121")
+                else()
+                    set(EF_FFDAS_CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}")
+                endif()
+            endif()
+            set(CMAKE_CUDA_ARCHITECTURES "${EF_FFDAS_CUDA_ARCHITECTURES}")
+            set(CMAKE_CUDA_SEPARABLE_COMPILATION OFF)
+            add_subdirectory("${EF_FFDAS_SOURCE}" "${CMAKE_BINARY_DIR}/ffdas")
+            if(TARGET ffdas)
+                set_property(TARGET ffdas PROPERTY
+                    CUDA_SEPARABLE_COMPILATION OFF)
+            endif()
+            set(CMAKE_CUDA_ARCHITECTURES "${EF_SAVED_CUDA_ARCHITECTURES}")
+            set(CMAKE_CUDA_SEPARABLE_COMPILATION
+                "${EF_SAVED_CUDA_SEPARABLE_COMPILATION}")
+        else()
+            message(FATAL_ERROR
+                "EF_USE_FFDAS=ON requires an installed ffdas package or the submodule at ${EF_FFDAS_SOURCE}")
+        endif()
+    endif()
+    if(TARGET ffdas::ffdas)
+        set(EF_FFDAS_TARGET ffdas::ffdas)
+    else()
+        set(EF_FFDAS_TARGET ffdas)
+    endif()
+endif()
 # --------------------------------------------------------------------------
 # Common include directories
 # --------------------------------------------------------------------------
@@ -177,8 +221,12 @@ target_include_directories(echoframe_core
 
 target_link_libraries(echoframe_core
     PRIVATE
-        CUDA::cudart     
+        CUDA::cudart
 )
+if(EF_USE_FFDAS)
+    target_link_libraries(echoframe_core PRIVATE ${EF_FFDAS_TARGET})
+    target_compile_definitions(echoframe_core PRIVATE EF_USE_FFDAS=1)
+endif()
 target_compile_definitions(echoframe_core
     PRIVATE
     NOMINMAX

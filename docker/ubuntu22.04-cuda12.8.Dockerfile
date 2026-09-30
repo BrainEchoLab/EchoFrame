@@ -29,7 +29,6 @@ ENV PATH="${VCPKG_ROOT}:${CARGO_HOME}/bin:${PATH}"
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     ca-certificates \
-    cmake \
     curl \
     fontconfig \
     git \
@@ -74,6 +73,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     xauth \
     zip \
+ && python3 -m pip install --no-cache-dir "cmake>=3.26,<4" \
  && rm -rf /var/lib/apt/lists/*
 
 # Shell tooling for distrobox sessions that inherit host dotfiles. fzf comes from
