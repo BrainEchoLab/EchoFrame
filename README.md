@@ -294,7 +294,7 @@ This section is meant to clarify what changes you can make to the CMake build co
 | `EF_BUILD_PYTHON` | **ON** | build the Python `echoframe` module |
 | `EF_BUILD_CLI` | **ON** | build the EchoFrame `cli` (command line) module |
 | `ENABLE_CUDA_TIMING` | **OFF** | print per-frame CUDA kernel timings from `process()` to the console |
-| `CMAKE_CUDA_ARCHITECTURES` | set from the CUDA version: `61;75;86;89;90` on CUDA 12.4+, `75;80;86;89;90;100;103;121` on CUDA 13+ | compute capability list. `CMakeLists.txt` sets it after `project()`, so a value passed on the command line is replaced — edit the list there to narrow it |
+| `CMAKE_CUDA_ARCHITECTURES` | set from the CUDA version: `61;75;86;89;90` on CUDA 12.4–12.7, `61;75;86;89;90;120` on CUDA 12.8–12.9, `75;80;86;89;90;100;103;120;121` on CUDA 13+ | compute capability list. `sm_120` covers consumer Blackwell (RTX 50 series) and needs CUDA 12.8 or newer; without it those GPUs JIT the `sm_90` PTX on every kernel launch. `CMakeLists.txt` sets it after `project()`, so a value passed on the command line is replaced — edit the list there to narrow it |
 
 Example: disabling Python in Linux:
 

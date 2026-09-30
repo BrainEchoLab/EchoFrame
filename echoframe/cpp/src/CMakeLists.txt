@@ -102,7 +102,14 @@ endif()
 if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 13)
     message(STATUS "CUDA Toolkit ${CUDAToolkit_VERSION} - using the CUDA 13 architecture list")
     add_compile_definitions(GGML_CUDA_USE_GRAPHS) # try to enable cuda graphs on cu13 build
-    set(CMAKE_CUDA_ARCHITECTURES "75;80;86;89;90;100;103;121") # lowest CUDA 13 standard
+    set(CMAKE_CUDA_ARCHITECTURES "75;80;86;89;90;100;103;120;121") # lowest CUDA 13 standard
+elseif(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 12.8)
+    # sm_120 (consumer Blackwell, e.g. RTX 50 series) needs CUDA 12.8 or newer,
+    # so it cannot go in the 12.4 list below. Without it those GPUs fall back to
+    # JIT-compiling the sm_90 PTX on every kernel launch.
+    message(STATUS "CUDA Toolkit ${CUDAToolkit_VERSION} - using the CUDA 12.8 architecture list")
+    add_compile_definitions(GGML_CUDA_USE_GRAPHS) # try to enable cuda graphs on cu12 build
+    set(CMAKE_CUDA_ARCHITECTURES "61;75;86;89;90;120") # lowest CUDA 12 standard + consumer Blackwell
 elseif(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 12.4)
     message(STATUS "CUDA Toolkit ${CUDAToolkit_VERSION} - using the CUDA 12 architecture list")
     add_compile_definitions(GGML_CUDA_USE_GRAPHS) # try to enable cuda graphs on cu12 build
@@ -132,7 +139,7 @@ if(NOT TARGET ffdas::ffdas AND NOT TARGET ffdas)
             "${CMAKE_CUDA_SEPARABLE_COMPILATION}")
         if(NOT EF_FFDAS_CUDA_ARCHITECTURES)
             if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 13)
-                set(EF_FFDAS_CUDA_ARCHITECTURES "80;86;89;90;100;103;121")
+                set(EF_FFDAS_CUDA_ARCHITECTURES "80;86;89;90;100;103;120;121")
             else()
                 set(EF_FFDAS_CUDA_ARCHITECTURES "${CMAKE_CUDA_ARCHITECTURES}")
             endif()
