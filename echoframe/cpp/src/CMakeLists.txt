@@ -227,7 +227,10 @@ target_link_libraries(echoframe_core
     PRIVATE
         CUDA::cudart
 )
-target_link_libraries(echoframe_core PRIVATE ${EF_FFDAS_TARGET})
+# PUBLIC, not PRIVATE: ffdas_beamformer.h includes <ffdas.h> and the out-of-line
+# definitions call ffdas_*, so every target that includes that header needs the
+# headers and the library, not just echoframe_core.
+target_link_libraries(echoframe_core PUBLIC ${EF_FFDAS_TARGET})
 target_compile_definitions(echoframe_core
     PRIVATE
     NOMINMAX
