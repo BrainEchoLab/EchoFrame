@@ -18,6 +18,8 @@
 
 #include <math.h>
 
+#include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -50,6 +52,18 @@ bool isComplexSingle(const mxArray *array) {
     return mxIsComplex(array) && mxIsSingle(array);
 }
 
+Beamform::BeamformerType getBeamformerType(const mxArray *reconStruct) {
+    const mxArray *field =
+        mxGetField(const_cast<mxArray *>(reconStruct), 0, "beamformerType");
+    if (!field) return Beamform::BeamformerType::Fourier;
+    std::string value(mxArrayToString(field));
+    std::transform(value.begin(), value.end(), value.begin(), ::tolower);
+    if (value == "fourier") return Beamform::BeamformerType::Fourier;
+    if (value == "das") return Beamform::BeamformerType::DAS;
+    throw std::invalid_argument(
+        "ReconSpec.beamformerType must be 'Fourier' or 'DAS'.");
+}
+
 // Validate ReceiveSpec struct
 void validateReceiveStruct(const mxArray *s) {
     checkField(s, "nSamples", mxIsInt32, "int32");
@@ -70,8 +84,13 @@ void convertMexResources(const mxArray *prhs[], EchoframeResources &res) {
     convertPDISpec(res.pdiSpec, res.receiveSpec, res.reconSpec,
                    prhs[INIT_INPUT_PDI_POS]);
 
-    convertFourierReconSpecStructs(res.fourierReconSpec,
+    if (res.reconSpec.beamformerType == Beamform::BeamformerType::DAS) {
+        convertDASReconSpecStructs(res.dasReconSpec,
                                    prhs[INIT_INPUT_RECON_POS]);
+    } else {
+        convertFourierReconSpecStructs(res.fourierReconSpec,
+                                       prhs[INIT_INPUT_RECON_POS]);
+    }
     disableStorageSpec(res.storageSpec);
 }
 
@@ -84,8 +103,13 @@ void convertMexResourcesWithStorage(const mxArray *prhs[], int nrhs,
     convertPDISpec(res.pdiSpec, res.receiveSpec, res.reconSpec,
                    prhs[INIT_INPUT_PDI_POS]);
 
-    convertFourierReconSpecStructs(res.fourierReconSpec,
+    if (res.reconSpec.beamformerType == Beamform::BeamformerType::DAS) {
+        convertDASReconSpecStructs(res.dasReconSpec,
                                    prhs[INIT_INPUT_RECON_POS]);
+    } else {
+        convertFourierReconSpecStructs(res.fourierReconSpec,
+                                       prhs[INIT_INPUT_RECON_POS]);
+    }
     // Storage initialization
     convertStorageStruct(res.bfStorageSpec, prhs[INIT_INPUT_BFSTORE_POS]);
     convertStorageStruct(res.pdiStorageSpec, prhs[INIT_INPUT_PDISTORE_POS]);
@@ -98,7 +122,8 @@ void convertMexResourcesWithStorage(const mxArray *prhs[], int nrhs,
     }
 }
 
-void convertReinitStorage(const mxArray *prhs[], int nrhs, EchoframeResources &res) {
+void convertReinitStorage(const mxArray *prhs[], int nrhs,
+                          EchoframeResources &res) {
     // Initialization code for Receive, Recon, and PDI structs
     convertStorageStruct(res.bfStorageSpec, prhs[REINIT_INPUT_BFSTORE_POS]);
     convertStorageStruct(res.pdiStorageSpec, prhs[REINIT_INPUT_PDISTORE_POS]);
@@ -114,8 +139,13 @@ void convertReinitStorage(const mxArray *prhs[], int nrhs, EchoframeResources &r
     if (res.bfStorageSpec.crop) {
         convertReconStruct(res.reconSpec, res.receiveSpec,
                            prhs[REINIT_INPUT_RECON_POS]);
-        convertFourierReconSpecStructs(res.fourierReconSpec,
+        if (res.reconSpec.beamformerType == Beamform::BeamformerType::DAS) {
+            convertDASReconSpecStructs(res.dasReconSpec,
                                        prhs[REINIT_INPUT_RECON_POS]);
+        } else {
+            convertFourierReconSpecStructs(res.fourierReconSpec,
+                                           prhs[REINIT_INPUT_RECON_POS]);
+        }
     }
     if (res.pdiStorageSpec.crop) {
         convertReconStruct(res.reconSpec, res.receiveSpec,
@@ -125,7 +155,8 @@ void convertReinitStorage(const mxArray *prhs[], int nrhs, EchoframeResources &r
     }
 }
 
-void convertReinitExperiment(const mxArray *prhs[], int nrhs, EchoframeResources &res) {
+void convertReinitExperiment(const mxArray *prhs[], int nrhs,
+                             EchoframeResources &res) {
     // Initialization code for Receive, Recon, and PDI structs
     convertStorageStruct(res.bfStorageSpec, prhs[REINIT_INPUT_BFSTORE_POS]);
     convertStorageStruct(res.pdiStorageSpec, prhs[REINIT_INPUT_PDISTORE_POS]);
@@ -217,6 +248,7 @@ void convertReconStruct(Beamform::ReconSpec &reconSpec,
     reconSpec.getBF = mxGetLogicals(mxGetField(reconStruct, 0, "getBF"))[0];
     reconSpec.getPDI = mxGetLogicals(mxGetField(reconStruct, 0, "getPDI"))[0];
     reconSpec.cropBF = mxGetLogicals(mxGetField(reconStruct, 0, "cropBF"))[0];
+    reconSpec.beamformerType = getBeamformerType(reconStruct);
 
     reconSpec.ensembleSize = receiveSpec.nRepeats;
 }
@@ -241,9 +273,9 @@ void convertPDISpec(PDI::PDISpec &pdiSpec,
     // Optional lower (noise) threshold: default 0 when the field is absent, so
     // specs / ScanParameters.mat written before this field still init.
     const mxArray *lowerField = mxGetField(pdiStruct, 0, "lowerThreshold");
-    pdiSpec.lowerThreshold =
-        (lowerField && mxIsSingle(lowerField)) ? mxGetSingles(lowerField)[0]
-                                               : 0.0f;
+    pdiSpec.lowerThreshold = (lowerField && mxIsSingle(lowerField))
+                                 ? mxGetSingles(lowerField)[0]
+                                 : 0.0f;
     pdiSpec.shiftSize = mxGetInt32s(mxGetField(pdiStruct, 0, "shiftSize"))[0];
     pdiSpec.cropPDI = mxGetLogicals(mxGetField(pdiStruct, 0, "cropPDI"))[0];
 
@@ -286,6 +318,47 @@ void convertFourierReconSpecStructs(
         mxGetSingles(mxGetField(reconStruct, 0, "planewaveDelays"));
     fourierReconSpec.tgcVector =
         mxGetSingles(mxGetField(reconStruct, 0, "tgcVector"));
+}
+
+void validateDASReconStruct(const mxArray *s) {
+    checkField(s, "dasChannelPositions", mxIsSingle, "single array");
+    checkField(s, "dasVoxelPositions", mxIsSingle, "single array");
+    checkField(s, "dasOffsets", mxIsSingle, "single array");
+    checkField(s, "dasWeights", mxIsSingle, "single array");
+    checkField(s, "dasWavenum", mxIsSingle, "single scalar");
+    checkField(s, "tgcVector", mxIsSingle, "single array");
+}
+
+void convertDASReconSpecStructs(Beamform::DASReconSpec &dasReconSpec,
+                                const mxArray *reconStruct) {
+    validateDASReconStruct(reconStruct);
+    dasReconSpec.channelPositions =
+        mxGetSingles(mxGetField(reconStruct, 0, "dasChannelPositions"));
+    dasReconSpec.voxelPositions =
+        mxGetSingles(mxGetField(reconStruct, 0, "dasVoxelPositions"));
+    dasReconSpec.offsets =
+        mxGetSingles(mxGetField(reconStruct, 0, "dasOffsets"));
+    dasReconSpec.weights =
+        mxGetSingles(mxGetField(reconStruct, 0, "dasWeights"));
+    dasReconSpec.tgcVector =
+        mxGetSingles(mxGetField(reconStruct, 0, "tgcVector"));
+    dasReconSpec.wavenum =
+        mxGetSingles(mxGetField(reconStruct, 0, "dasWavenum"))[0];
+
+    const mxArray *alg =
+        mxGetField(const_cast<mxArray *>(reconStruct), 0, "dasAlgorithm");
+    dasReconSpec.algorithm = (alg && mxIsInt32(alg)) ? mxGetInt32s(alg)[0] : 1;
+
+    const mxArray *compute =
+        mxGetField(const_cast<mxArray *>(reconStruct), 0, "dasComputeType");
+    dasReconSpec.computeType =
+        (compute && mxIsInt32(compute)) ? mxGetInt32s(compute)[0] : 0;
+
+    const mxArray *dirs = mxGetField(const_cast<mxArray *>(reconStruct), 0,
+                                     "dasSourceDirections");
+    dasReconSpec.useDirectivity = dirs && !mxIsEmpty(dirs);
+    dasReconSpec.sourceDirections =
+        dasReconSpec.useDirectivity ? mxGetSingles(dirs) : nullptr;
 }
 
 // Validate StorageSpec struct

@@ -7,7 +7,7 @@
  * The EchoFrameCore class is responsible for managing the processing pipeline
  * of the EchoFrame system, including beamforming, PDI processing, and storage
  * management. It provides methods for initializing the system, processing RF
- * data, and retrieving outputs. 
+ * data, and retrieving outputs.
  * @version 0.1
  * @date 2025-06-20
  *
@@ -26,6 +26,7 @@
 #include "../../libs/Storage/src/storage/Handler.h"
 #include "../beamformer/BF_formatter.h"
 #include "../beamformer/RF_formatter.h"
+#include "../beamformer/das/ffdas_beamformer.h"
 #include "../beamformer/echoframe_resources_bundle.h"
 #include "../beamformer/fourier_imaging/fourier_imaging.h"
 #include "../cuda/cuda_event_timer.hpp"
@@ -99,19 +100,20 @@ struct EchoFrameTimings {
  * the disk held the source buffer, and how close the queue came to full.
  */
 struct EchoFrameStreamStats {
-    bool saving;                     ///< Whether this stream is being written.
-    unsigned long long writes;       ///< Completed writes.
+    bool saving;                ///< Whether this stream is being written.
+    unsigned long long writes;  ///< Completed writes.
     unsigned long long buffersQueued;  ///< storeBuffer calls accepted.
-    double latencyMeanMs;            ///< Mean queue-to-completion time.
-    double latencyMaxMs;             ///< Worst queue-to-completion time.
-    int peakInFlight;                ///< Highest concurrent outstanding writes.
-    int queueCapacity;               ///< nBuffers-1: most that may be outstanding.
-    int slotRingDepth;               ///< Producer slot-ring depth: nBuffers
-                                     ///< with the ring on, 1 with it off.
-    double blockedTotalMs;           ///< Time storeBuffer waited for a slot.
-    double blockedMaxMs;             ///< Worst single wait.
-    unsigned long long verified;     ///< Writes checked by EF_STORAGE_VERIFY.
-    unsigned long long corrupted;    ///< Of those, sources that changed in flight.
+    double latencyMeanMs;              ///< Mean queue-to-completion time.
+    double latencyMaxMs;               ///< Worst queue-to-completion time.
+    int peakInFlight;             ///< Highest concurrent outstanding writes.
+    int queueCapacity;            ///< nBuffers-1: most that may be outstanding.
+    int slotRingDepth;            ///< Producer slot-ring depth: nBuffers
+                                  ///< with the ring on, 1 with it off.
+    double blockedTotalMs;        ///< Time storeBuffer waited for a slot.
+    double blockedMaxMs;          ///< Worst single wait.
+    unsigned long long verified;  ///< Writes checked by EF_STORAGE_VERIFY.
+    unsigned long long
+        corrupted;  ///< Of those, sources that changed in flight.
 };
 
 /**
@@ -136,7 +138,8 @@ inline EchoFrameStreamStats makeStreamStats(
     EchoFrameStreamStats s{};
     s.saving = spec.save;
     s.writes = w.completed;
-    s.buffersQueued = static_cast<unsigned long long>(handler.getBuffersQueued());
+    s.buffersQueued =
+        static_cast<unsigned long long>(handler.getBuffersQueued());
     s.latencyMeanMs = w.latencyMeanMs();
     s.latencyMaxMs = w.latencyMaxMs;
     s.peakInFlight = w.outstandingHighWater;
@@ -267,7 +270,8 @@ class EchoFrameCore {
     // (aio_write) never races a deallocation. cudaMallocHost rather than
     // std::vector because O_DIRECT needs a page-aligned address, which
     // alignof(double) does not give; the constructor verifies the alignment.
-    // mTimeTags is a view into the ring, not the allocation: free mTimeTagsBase.
+    // mTimeTags is a view into the ring, not the allocation: free
+    // mTimeTagsBase.
 
     // PDI slot process() stored, so processAndGetOutputs returns that buffer
     // rather than calling getResults() again -- each call advances the PDI

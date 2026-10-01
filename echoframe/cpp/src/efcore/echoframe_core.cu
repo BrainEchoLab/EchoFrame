@@ -42,6 +42,7 @@
 
 #include "../../libs/Storage/src/storage/Handler.t.hpp"
 #include "../beamformer/beamformer.t.hpp"
+#include "../beamformer/das/ffdas_beamformer.t.hpp"
 #include "../beamformer/fourier_imaging/fourier_imaging.t.hpp"
 #include "../cuda/cuda_error.h"
 
@@ -92,8 +93,8 @@ void refreshStorageSlotRings() {
     // during a disk stall that the ringed streams came through clean.
     //
     // RF has no ring. Staging it costs a whole frame per slot -- about 50 ms on
-    // the clinic protocol, which put the loop over its acquisition period -- and
-    // the acquisition ring already does the job for free: the hardware only
+    // the clinic protocol, which put the loop over its acquisition period --
+    // and the acquisition ring already does the job for free: the hardware only
     // reuses a receive frame after cycling through the others, so a deep enough
     // ring outlasts the write. init_storage warns when the depths make that
     // impossible.
@@ -104,7 +105,8 @@ void refreshStorageSlotRings() {
     const bool globalSet = (global != nullptr && global[0] != '\0');
     const bool globalOn = globalSet && global[0] == '1';
 
-    g_ringBF = envFlag("EF_STORAGE_SLOT_RINGS_BF", globalSet ? globalOn : false);
+    g_ringBF =
+        envFlag("EF_STORAGE_SLOT_RINGS_BF", globalSet ? globalOn : false);
     g_ringPDI =
         envFlag("EF_STORAGE_SLOT_RINGS_PDI", globalSet ? globalOn : true);
     g_ringTag =
@@ -130,9 +132,12 @@ void refreshStorageSlotRings() {
 bool storageSlotRingsEnabled(StorageStream stream) {
     if (!g_ringsRead) refreshStorageSlotRings();
     switch (stream) {
-        case StorageStream::BF: return g_ringBF;
-        case StorageStream::PDI: return g_ringPDI;
-        case StorageStream::RFTimeTag: return g_ringTag;
+        case StorageStream::BF:
+            return g_ringBF;
+        case StorageStream::PDI:
+            return g_ringPDI;
+        case StorageStream::RFTimeTag:
+            return g_ringTag;
     }
     return false;
 }
@@ -159,7 +164,8 @@ EchoFrameCore::EchoFrameCore(const EchoframeResources &res, bool useStorage)
     // let a violation surface later as an aio_error two layers away.
     mTimeTagsCount =
         static_cast<size_t>(res.receiveSpec.nRepeats) * res.receiveSpec.nTX;
-    resizeTimeTagRing(storageSlotsFor(res.rfTimeTagStorageSpec, StorageStream::RFTimeTag));
+    resizeTimeTagRing(
+        storageSlotsFor(res.rfTimeTagStorageSpec, StorageStream::RFTimeTag));
 
     // Initialization banner
     banner() << "+--------------------------- INITIALIZING ECHOFRAME "
@@ -187,7 +193,8 @@ EchoFrameCore::EchoFrameCore(const EchoframeResources &res, bool useStorage)
     }
     pdiObject = new PDI::PDI(resources.pdiSpec, resources.receiveSpec,
                              resources.reconSpec, false);
-    pdiObject->setStorageSlots(storageSlotsFor(resources.pdiStorageSpec, StorageStream::PDI));
+    pdiObject->setStorageSlots(
+        storageSlotsFor(resources.pdiStorageSpec, StorageStream::PDI));
 
     banner() << "+----------------------------- ECHOFRAME INITIALIZED "
                 "-----------------------------+"
@@ -228,7 +235,8 @@ EchoFrameCore::EchoFrameCore(const PDI::PDISpec &pdiSpec,
     }
     pdiObject = new PDI::PDI(resources.pdiSpec, resources.receiveSpec,
                              resources.reconSpec, true);
-    pdiObject->setStorageSlots(storageSlotsFor(resources.pdiStorageSpec, StorageStream::PDI));
+    pdiObject->setStorageSlots(
+        storageSlotsFor(resources.pdiStorageSpec, StorageStream::PDI));
 
     if (storageInitialized && resources.pdiStorageSpec.save) {
         pdiStorageHandler = Storage::Handler<float>(
@@ -266,9 +274,9 @@ void EchoFrameCore::resizeTimeTagRing(int nSlots) {
         mTimeTagsBase = nullptr;
         mTimeTags = nullptr;
     }
-    gpuErrchk(cudaMallocHost(&mTimeTagsBase,
-                             static_cast<size_t>(mTimeTagsSlots) *
-                                 mTimeTagsStride * sizeof(double)));
+    gpuErrchk(
+        cudaMallocHost(&mTimeTagsBase, static_cast<size_t>(mTimeTagsSlots) *
+                                           mTimeTagsStride * sizeof(double)));
     mTimeTags = mTimeTagsBase;
 
     if (reinterpret_cast<uintptr_t>(mTimeTags) % kAssumedPageAlignment != 0) {
@@ -437,9 +445,11 @@ void EchoFrameCore::reinitStorage(const EchoframeResources &newRes) {
 
     // Saving may have just been switched on; resize before updateCropSpecs()
     // reallocates the cropped ring.
-    bfFormatter.setStorageSlots(storageSlotsFor(resources.bfStorageSpec, StorageStream::BF),
-                                resources.bfStorageSpec.crop);
-    resizeTimeTagRing(storageSlotsFor(resources.rfTimeTagStorageSpec, StorageStream::RFTimeTag));
+    bfFormatter.setStorageSlots(
+        storageSlotsFor(resources.bfStorageSpec, StorageStream::BF),
+        resources.bfStorageSpec.crop);
+    resizeTimeTagRing(storageSlotsFor(resources.rfTimeTagStorageSpec,
+                                      StorageStream::RFTimeTag));
 
     if (resources.bfStorageSpec.crop) {
         bfFormatter.updateCropSpecs(resources.reconSpec);
@@ -455,7 +465,8 @@ void EchoFrameCore::reinitStorage(const EchoframeResources &newRes) {
                                  resources.reconSpec);
     }
     if (pdiObject != nullptr)
-        pdiObject->setStorageSlots(storageSlotsFor(resources.pdiStorageSpec, StorageStream::PDI));
+        pdiObject->setStorageSlots(
+            storageSlotsFor(resources.pdiStorageSpec, StorageStream::PDI));
 }
 
 void EchoFrameCore::reinitExperiment(const EchoframeResources &newRes) {
@@ -478,11 +489,14 @@ void EchoFrameCore::reinitExperiment(const EchoframeResources &newRes) {
     rfTimeTagStorageHandler = std::move(newRFTimeTagStorageHandler);
 
     // The new specs may enable or disable saving; re-size the rings to match.
-    bfFormatter.setStorageSlots(storageSlotsFor(resources.bfStorageSpec, StorageStream::BF),
-                                resources.bfStorageSpec.crop);
+    bfFormatter.setStorageSlots(
+        storageSlotsFor(resources.bfStorageSpec, StorageStream::BF),
+        resources.bfStorageSpec.crop);
     if (pdiObject != nullptr)
-        pdiObject->setStorageSlots(storageSlotsFor(resources.pdiStorageSpec, StorageStream::PDI));
-    resizeTimeTagRing(storageSlotsFor(resources.rfTimeTagStorageSpec, StorageStream::RFTimeTag));
+        pdiObject->setStorageSlots(
+            storageSlotsFor(resources.pdiStorageSpec, StorageStream::PDI));
+    resizeTimeTagRing(storageSlotsFor(resources.rfTimeTagStorageSpec,
+                                      StorageStream::RFTimeTag));
 }
 
 void EchoFrameCore::updatePDIThreshold(const float newThreshold) {
@@ -497,15 +511,16 @@ void EchoFrameCore::updatePDILowerThreshold(const float newLowerThreshold) {
 
 EchoFrameTimings EchoFrameCore::getLastTimings() {
     EchoFrameTimings t{};
-    t.rf_transfer    = eventTimer.elapsedTime("RFTransfer");
-    t.rf_formatting  = eventTimer.elapsedTime("RFFormatting");
-    t.beamforming    = eventTimer.elapsedTime("Beamforming");
-    t.bf_formatting  = eventTimer.elapsedTime("BFFormatting");
+    t.rf_transfer = eventTimer.elapsedTime("RFTransfer");
+    t.rf_formatting = eventTimer.elapsedTime("RFFormatting");
+    t.beamforming = eventTimer.elapsedTime("Beamforming");
+    t.bf_formatting = eventTimer.elapsedTime("BFFormatting");
     t.pdi_processing = eventTimer.elapsedTime("PDIProcessing");
-    t.pdi_transfer   = eventTimer.elapsedTime("PDITransfer");
-    t.bf_storage     = eventTimer.elapsedTime("BFStorage");  // queueing, not the write
-    t.pdi_storage    = eventTimer.elapsedTime("PDIStorage");
-    t.total          = eventTimer.elapsedTime("TotalTime");
+    t.pdi_transfer = eventTimer.elapsedTime("PDITransfer");
+    t.bf_storage =
+        eventTimer.elapsedTime("BFStorage");  // queueing, not the write
+    t.pdi_storage = eventTimer.elapsedTime("PDIStorage");
+    t.total = eventTimer.elapsedTime("TotalTime");
     return t;
 }
 
@@ -517,10 +532,10 @@ EchoFrameStorageStats EchoFrameCore::getStorageStats() const {
     s.pdi = makeStreamStats(
         pdiStorageHandler, resources.pdiStorageSpec,
         storageSlotsFor(resources.pdiStorageSpec, StorageStream::PDI));
-    s.timetag = makeStreamStats(
-        rfTimeTagStorageHandler, resources.rfTimeTagStorageSpec,
-        storageSlotsFor(resources.rfTimeTagStorageSpec,
-                        StorageStream::RFTimeTag));
+    s.timetag =
+        makeStreamStats(rfTimeTagStorageHandler, resources.rfTimeTagStorageSpec,
+                        storageSlotsFor(resources.rfTimeTagStorageSpec,
+                                        StorageStream::RFTimeTag));
     return s;
 }
 
@@ -530,23 +545,32 @@ void EchoFrameCore::prepare_beamform(
     Beamform::RFFormatter<rfType_t, bfType_t> &rfFormatter,
     Beamform::BFFormatter<bfType_t, outputType_t> &bfFormatter,
     Beamform::Beamformer<bfType_t> **beamformerPtr) {
-    rfFormatter = std::move(Beamform::RFFormatter<rfType_t, bfType_t>(
-        resources.receiveSpec));
+    rfFormatter = std::move(
+        Beamform::RFFormatter<rfType_t, bfType_t>(resources.receiveSpec));
 
     bfFormatter = std::move(Beamform::BFFormatter<bfType_t, outputType_t>(
         resources.receiveSpec, resources.reconSpec,
         resources.reconSpec.totalSize * resources.reconSpec.ensembleSize,
-        resources.reconSpec.totalSizeCropped * resources.reconSpec.ensembleSize));
+        resources.reconSpec.totalSizeCropped *
+            resources.reconSpec.ensembleSize));
 
     // Size the BF ring before initializeResources() allocates the cropped one.
-    bfFormatter.setStorageSlots(storageSlotsFor(resources.bfStorageSpec, StorageStream::BF),
-                                resources.bfStorageSpec.crop);
+    bfFormatter.setStorageSlots(
+        storageSlotsFor(resources.bfStorageSpec, StorageStream::BF),
+        resources.bfStorageSpec.crop);
 
     bfFormatter.initializeResources();
 
     // Heap-allocate so each init gets a fresh instance sized for the current
     // specs; a static instance could only be sized once per MEX load. Owned by
     // EchoFrameCore::beamformerPtr and deleted in the destructor.
+    if (resources.reconSpec.beamformerType == Beamform::BeamformerType::DAS) {
+        *beamformerPtr = new Beamform::FFDASBeamformer<bfType_t>(
+            std::move(resources.receiveSpec), resources.reconSpec,
+            std::move(resources.dasReconSpec), rfFormatter.getFormattedRF());
+        return;
+    }
+
     *beamformerPtr = new Beamform::FourierImaging<bfType_t>(
         std::move(resources.receiveSpec), resources.reconSpec,
         std::move(resources.fourierReconSpec), rfFormatter.getFormattedRF());

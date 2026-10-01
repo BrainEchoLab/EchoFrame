@@ -328,10 +328,17 @@ void LinuxFileIO<bufferType_t>::queryAlignment() {
         throw storageException(
             std::string("queryAlignment: statx failed: ") + strerror(errno) +
             "\n");
-    if (!(stx.stx_mask & kEfStatxDioalign))
-        throw storageException(
-            "queryAlignment: kernel does not report STATX_DIOALIGN "
-            "(requires Linux 6.1+)\n");
+    if (!(stx.stx_mask & kEfStatxDioalign)) {
+        mSectorSize = (stx.stx_mask & kEfStatxBasicStats) && stx.stx_blksize > 0
+                          ? stx.stx_blksize
+                          : 4096;
+        mMemAlign = 4096;
+        if (logAtLeast(kLogNormal))
+            std::cerr << "queryAlignment: kernel does not report STATX_DIOALIGN; "
+                         "using conservative 4096-byte O_DIRECT alignment.\n";
+        mHeaderSize = computeHeaderSize();
+        return;
+    }
     if (stx.stx_dio_offset_align == 0 || stx.stx_dio_mem_align == 0)
         throw storageException(
             "queryAlignment: filesystem does not support/enforce O_DIRECT "
