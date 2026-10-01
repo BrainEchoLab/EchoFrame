@@ -422,7 +422,7 @@ def main() -> None:
         im = ax.imshow(
             20 * np.log10(img / vmax + np.finfo(np.float32).eps),
             cmap="gray",
-            vmin=-60,
+            vmin=-40,
             vmax=0,
         )
         ax.set_title(title)
