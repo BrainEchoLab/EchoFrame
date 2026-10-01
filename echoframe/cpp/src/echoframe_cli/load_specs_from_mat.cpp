@@ -299,6 +299,11 @@ void loadSpecsFromMat(const std::string &matFile, EchoframeResources &res) {
         DAS.computeType = hasField(Pm.get(), "dasComputeType")
                               ? scalar<int32_t>(Pm.get(), "dasComputeType")
                               : 0;
+        if (hasField(Pm.get(), "dasSourceDirections")) {
+            static auto sourceDirs = vec<float>(Pm.get(), "dasSourceDirections");
+            DAS.sourceDirections = sourceDirs.data();
+            DAS.useDirectivity = true;
+        }
     } else {
         validateFourierMatStruct(Pm.get());
 

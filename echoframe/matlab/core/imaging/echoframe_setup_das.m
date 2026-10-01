@@ -61,11 +61,55 @@ for iTx = 1:nTx
     ReconSpec.dasOffsets(:, :, iTx) = single(max(offsets, minOffset));
 end
 
-ReconSpec.dasWeights = ones(nz, nx, nTx, 'single') ./ single(max(1, nTx * nActive));
+fNumber = directivity_f_number(ProbeSpec, ReconSpec);
+cosAlpha = single(cos(atan(1 / (2 * fNumber))));
+
+channelXRow = reshape(channelX, 1, 1, []);
+directivityMask = single(zGrid ./ sqrt((xGrid - channelXRow).^2 + zGrid.^2) > double(cosAlpha));
+ReconSpec.dasWeights = zeros(nz, nx, nTx, 'single');
+for iTx = 1:nTx
+    phase = double(ReconSpec.dasOffsets(:, :, iTx)) + reshape(receiveSamples, nz, nx, []);
+    valid = directivityMask & single(phase >= 0 & phase < double(ReceiveSpec.nSamplesIQ - 1));
+    counts = sum(valid, 3);
+    ReconSpec.dasWeights(:, :, iTx) = single(counts > 0) ./ single(max(1, nTx * counts));
+end
+
 % RFFormatter stores IQ as I - iQ, so ffdas' usual negative phase rotation
 % is conjugated here.
 ReconSpec.dasWavenum = single(4 * pi * double(ProbeSpec.Fc) / double(ReceiveSpec.Fs));
 ReconSpec.dasAlgorithm = int32(1);
 ReconSpec.dasComputeType = int32(0);
-ReconSpec.dasSourceDirections = single(repmat([0; 0; 1; cosd(35)], 1, nActive));
+ReconSpec.dasSourceDirections = single(repmat([0; 0; 1; cosAlpha], 1, nActive));
+end
+
+function fNumber = directivity_f_number(ProbeSpec, ReconSpec)
+% -3 dB piston-element directivity cutoff from Perrot et al. Defaults are
+% deliberately boring: pitch as element width, Fc as highest useful frequency.
+width = getfield_default(ProbeSpec, {'elementWidth', 'ElementWidth', 'width'}, ProbeSpec.pitch);
+fmax = getfield_default(ProbeSpec, {'fmax', 'Fmax'}, ProbeSpec.Fc);
+if isfield(ProbeSpec, 'bandwidth')
+    fmax = double(ProbeSpec.Fc) + double(ProbeSpec.bandwidth) / 2;
+elseif isfield(ProbeSpec, 'bandwidthFraction')
+    fmax = double(ProbeSpec.Fc) * (1 + double(ProbeSpec.bandwidthFraction) / 2);
+end
+lambda = double(ReconSpec.c0) / double(fmax);
+theta = linspace(0, pi/2 - 1e-3, 4096);
+directivity = abs(cos(theta) .* sinc(double(width) / lambda * sin(theta)));
+idx = find(directivity <= 0.71, 1, 'first');
+if isempty(idx)
+    alpha = theta(end);
+else
+    alpha = theta(idx);
+end
+fNumber = 1 / (2 * tan(alpha));
+end
+
+function value = getfield_default(s, names, defaultValue)
+value = defaultValue;
+for i = 1:numel(names)
+    if isfield(s, names{i}) && ~isempty(s.(names{i}))
+        value = s.(names{i});
+        return;
+    end
+end
 end
