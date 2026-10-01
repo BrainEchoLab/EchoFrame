@@ -19,6 +19,7 @@ echoframe/cpp/out/
 *.h5
 
 *.mat
+/Perrot et al. - 2021 - So you think you can DAS A viewpoint on delay-and-sum beamforming.pdf
 
 __pycache__/
 
