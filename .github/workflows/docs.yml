@@ -29,11 +29,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Breathe renders Doxygen's XML, so Doxygen has to run first.
+      # Breathe renders Doxygen's XML, so Doxygen has to run first. The release
+      # binary comes from GitHub, so the step does not depend on the Ubuntu mirrors.
       - name: Install Doxygen
         run: |
-          sudo apt-get -o Acquire::Retries=5 update
-          sudo apt-get -o Acquire::Retries=5 install --no-install-recommends -y doxygen
+          curl -fsSL --retry 5 -o "$RUNNER_TEMP/doxygen.tar.gz" \
+            https://github.com/doxygen/doxygen/releases/download/Release_1_12_0/doxygen-1.12.0.linux.bin.tar.gz
+          tar -xzf "$RUNNER_TEMP/doxygen.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/doxygen-1.12.0/bin" >> "$GITHUB_PATH"
 
       - name: Install doc requirements
         run: python -m pip install --upgrade pip -r documentation/requirements.txt

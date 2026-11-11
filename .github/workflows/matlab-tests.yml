@@ -39,6 +39,9 @@ jobs:
         uses: matlab-actions/setup-matlab@v2
         with:
           release: R2024a
+          # No apt step: the runner image already has the libraries MATLAB
+          # needs to run -batch, and the Ubuntu mirrors are not always reachable.
+          install-system-dependencies: false
           # verify_core_headless reaches initialize_image_reconstruction, which
           # builds tgcVector with gausswin, and echoframe_setup_fourier, which
           # apodises k-space with tukeywin.
