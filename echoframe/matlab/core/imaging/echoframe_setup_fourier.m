@@ -134,7 +134,8 @@ switch ReceiveSpec.samplingMode
     case 'BS67BW'
         Nz              = single(ReceiveSpec.nSamples * 2);
         freq_scale      = 2;
-        lower           = Nz/2;
+        % The negative-frequency half starts after the positive half in FFT order.
+        lower           = Nz/2 + 1;
         freq_window     = lower:(lower + Nz/4 - 1);
         freq_mapping    = 1:Nz/4;
         freq_axis_shift = false;

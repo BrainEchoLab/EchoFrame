@@ -156,6 +156,8 @@ end
 assert(threw, 'validate_structs accepted a ReceiveSpec missing samplingMode');
 fprintf('  missing required field rejected  OK\n');
 
+local_verify_fourier_sampling();
+
 %% ------------------------------------------------------- 5. cropped frames
 fprintf('\n=== stored_frame_size (cropped storage geometry) ===\n');
 
@@ -489,4 +491,56 @@ PDISpec.threshold    = single(0.4);
 PDISpec.shiftSize    = int32(40);
 PDISpec.cropPDI      = logical(false);
 PDISpec.svdMethod    = 'Covariance';
+end
+
+function local_verify_fourier_sampling()
+% A known transmit delay must be cancelled at the dominant receive-tone bin.
+modes = {'BS50BW', 'BS67BW', 'BS100BW', 'NS200BW'};
+rateFactors = [4, 4/3, 4, 4];
+P = struct('pitch', 300e-6, 'nElements', 8);
+T = struct('c0', 1540, 'steer', 0, 'apodization', ones(8,1));
+Resource = struct('Parameters', struct('numRcvChannels', 128));
+for fc = [1e6, 31.25e6]
+    Trans = struct('frequency', fc/1e6, 'numelements', 8);
+    for n = [128, 512]
+        rec = struct('c0', 1540, 'nx', 128, 'nz', n/2);
+        for m = 1:numel(modes)
+            r = struct('samplingMode', modes{m}, 'nBuffers', 1, ...
+                'nSamples', n, 'nSamplesIQ', n/2, 'nTransmissions', 1);
+            [~, ~, ~, r] = get_system_parameters(Resource, Trans, T, r);
+            assert(abs(r.Fs/fc - rateFactors(m)) < 1e-6, ...
+                'Wrong pre-quadrature sample rate for %s', modes{m});
+            switch modes{m}
+                case 'BS50BW'
+                    starts = 2*(0:n/2-1)/fc;
+                    times = reshape([starts; starts + 1/(4*fc)], [], 1);
+                case 'BS100BW'
+                    starts = (0:n/2-1)/fc;
+                    times = reshape([starts; starts + 1/(4*fc)], [], 1);
+                case 'BS67BW'
+                    times = (0:n-1)'*3/(4*fc);
+                case 'NS200BW'
+                    times = (0:n-1)'/(4*fc);
+            end
+            for shift = [0, 1/(8*fc)]
+                T.transmitDelays = shift * ones(8,1);
+                s = echoframe_setup_fourier(P, T, r, rec);
+                assert(numel(s.frequencyAxis) == n/2);
+                assert(all(s.delayIndices(:) >= 0 & s.delayIndices(:) < n/2));
+                for tone = fc*[0.875, 1, 1.125]
+                    a = int16(round(16000*cos(2*pi*tone*times)));
+                    b = int16(round(16000*cos(2*pi*tone*(times-shift))));
+                    a = fft(complex(single(a(1:2:end)), -single(a(2:2:end))));
+                    b = fft(complex(single(b(1:2:end)), -single(b(2:2:end))));
+                    [~, k] = max(abs(a));
+                    rotation = exp(1i*double(s.frequencyAxis(k))*double(s.planewaveDelays(1,2)));
+                    assert(abs(double(b(k))/double(a(k))*rotation - 1) < 2e-4, ...
+                        'Fourier delay correction failed: %s, Fc=%g, n=%d, tone=%g', ...
+                        modes{m}, fc, n, tone);
+                end
+            end
+        end
+    end
+end
+fprintf('  all four sampling modes cancel known tone delays  OK\n');
 end
