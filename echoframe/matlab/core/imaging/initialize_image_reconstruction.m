@@ -67,10 +67,18 @@ zeros_samples_end = zeros(1,round(3 * ReceiveSpec.samplesPerWavelength));
 tgc = ones(1,ReceiveSpec.nSamplesIQ - length(zeros_samples_start) - length(zeros_samples_end));
 ReconSpec.tgcVector = convn([zeros_samples_start tgc zeros_samples_end],temp_kernel,'same');
 
-% Get the Fourier interpolation lookup tables  
-ReconSpec = echoframe_setup_fourier(ProbeSpec,TransmitSpec,ReceiveSpec,ReconSpec);
+if ~isfield(ReconSpec, 'beamformerType') || isempty(ReconSpec.beamformerType)
+    ReconSpec.beamformerType = 'Fourier';
+end
 
 nElementRf                   = double(ReceiveSpec.nChannels);
 ReconSpec.xAxis              = linspace(-(nElementRf/2)*ProbeSpec.pitch, (nElementRf/2)*ProbeSpec.pitch, Nx) * 1e3;
-ReconSpec.zAxis              = linspace(ReceiveSpec.startDepthMm,ReceiveSpec.startDepthMm + ReceiveSpec.actualEndDepthMm, Nz);
+% actualEndDepthMm is absolute (includes startDepthMm), not a span.
+ReconSpec.zAxis              = linspace(ReceiveSpec.startDepthMm, ReceiveSpec.actualEndDepthMm, Nz);
 ReconSpec.imageSize           = [Nz Nx];
+
+if strcmpi(ReconSpec.beamformerType, 'DAS')
+    ReconSpec = echoframe_setup_das(ProbeSpec,TransmitSpec,ReceiveSpec,ReconSpec);
+else
+    ReconSpec = echoframe_setup_fourier(ProbeSpec,TransmitSpec,ReceiveSpec,ReconSpec);
+end

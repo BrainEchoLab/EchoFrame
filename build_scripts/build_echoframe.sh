@@ -13,7 +13,8 @@
 #                       $HOME/MATLAB/R2024a)
 #   --no-mex            skip the MATLAB MEX layer
 #   --no-python         skip the Python extension module
-#   --no-cli            skip the CLI (this is what needs vcpkg)
+#   --cli               also build the CLI (off by default: needs vcpkg)
+#   --configure-only    configure the tree, then stop without building
 #   --clean             delete the build tree first
 #   -j N                parallel jobs (default: nproc)
 #   -h, --help          this message
@@ -31,7 +32,8 @@ BUILD_TYPE="Release"
 MATLAB_ROOT="${Matlab_ROOT_DIR:-${HOME}/MATLAB/R2024a}"
 BUILD_MEX="ON"
 BUILD_PYTHON="ON"
-BUILD_CLI="ON"
+BUILD_CLI="OFF"
+CONFIGURE_ONLY=0
 CLEAN=0
 JOBS="$(nproc)"
 
@@ -54,7 +56,8 @@ while [ $# -gt 0 ]; do
         --matlab-root) MATLAB_ROOT="$2"; shift 2 ;;
         --no-mex)      BUILD_MEX="OFF"; shift ;;
         --no-python)   BUILD_PYTHON="OFF"; shift ;;
-        --no-cli)      BUILD_CLI="OFF"; shift ;;
+        --cli)         BUILD_CLI="ON"; shift ;;
+        --configure-only) CONFIGURE_ONLY=1; shift ;;
         --clean)       CLEAN=1; shift ;;
         -j)            JOBS="$2"; shift 2 ;;
         -h|--help)     sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -78,8 +81,14 @@ if [ ! -e "${REPO_ROOT}/echoframe/cpp/libs/GSL/include/gsl/gsl" ]; then
     die "GSL submodule is empty. Run: git submodule update --init --recursive"
 fi
 
+# ffdas is a gitlink too, and it is not optional: CMake configures it in
+# unconditionally now, so an empty checkout stops the configure step.
+if [ ! -e "${REPO_ROOT}/echoframe/cpp/libs/ffdas/CMakeLists.txt" ]; then
+    die "ffdas submodule is empty. Run: git submodule update --init --recursive"
+fi
+
 if [ "${BUILD_CLI}" = "ON" ] && [ -z "${VCPKG_ROOT:-}" ]; then
-    die "EF_BUILD_CLI is ON but VCPKG_ROOT is unset. Set it, or pass --no-cli.
+    die "EF_BUILD_CLI is ON but VCPKG_ROOT is unset. Set it, or drop --cli.
        Dependencies come from echoframe/cpp/src/vcpkg.json in manifest mode;
        no manual 'vcpkg install' is needed."
 fi
@@ -95,7 +104,10 @@ CUDA_VER="$(nvcc --version | sed -n 's/.*release \([0-9][0-9]*\.[0-9][0-9]*\).*/
 CUDA_MAJOR="${CUDA_VER%%.*}"
 if [ -z "${CMAKE_CUDA_ARCHITECTURES:-}" ]; then
     if [ "${CUDA_MAJOR}" -ge 13 ]; then
-        CMAKE_CUDA_ARCHITECTURES="75;80;86;89;90;100;103;121"
+        CMAKE_CUDA_ARCHITECTURES="75;80;86;89;90;100;103;120;121"
+    elif [ "${CUDA_VER}" = "12.8" ] || [ "${CUDA_VER}" = "12.9" ]; then
+        # sm_120 (consumer Blackwell) needs CUDA 12.8 or newer.
+        CMAKE_CUDA_ARCHITECTURES="61;75;86;89;90;120"
     else
         CMAKE_CUDA_ARCHITECTURES="61;75;86;89;90"
     fi
@@ -123,6 +135,10 @@ CONFIGURE_ARGS=(
 command -v ninja >/dev/null && CONFIGURE_ARGS+=(-G Ninja)
 
 cmake "${CONFIGURE_ARGS[@]}"
+if [ "${CONFIGURE_ONLY}" = "1" ]; then
+    note "configured only; not building (--configure-only)"
+    exit 0
+fi
 cmake --build "${BUILD_DIR}" -j "${JOBS}"
 
 # --- report ---------------------------------------------------------------

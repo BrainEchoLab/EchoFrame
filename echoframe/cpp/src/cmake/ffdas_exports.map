@@ -1,0 +1,30 @@
+/* Only the ffdas C API leaves this library.
+ *
+ * ffdas links the C++ runtime statically (see its CMakeLists.txt) so it stays
+ * self-contained and cannot clash with the runtime the host already has -- under
+ * MATLAB, which ships its own, or under CPython. Static, though, does not mean
+ * private: without a version script the linker puts every one of those runtime
+ * symbols in the dynamic symbol table, and the loader then binds the *whole
+ * process* -- the echoframe extension, the CLI, anything else -- to this second,
+ * private copy of the standard library.
+ *
+ * Two copies do not agree. Each has its own std::locale::id table, so a
+ * std::use_facet<> lookup keyed on the host's id misses the facet the host
+ * registered, throws std::bad_cast, and the stream it was called on is marked
+ * bad. That is silent by default: with exceptions off on std::cout the first
+ * std::cout << <arithmetic> leaves the stream in an error state and every later
+ * write to it is discarded. The banners stop mid-line, partway through the first
+ * GPU-info row, and only once something else in the process has perturbed the
+ * lookup order -- importing matplotlib from Python is enough, which is why it
+ * reads as a matplotlib bug and why echoframe_cli on the same machine looks fine.
+ *
+ * `local: *` is what makes the static link private. It applies to defined
+ * symbols only, so the undefined CUDA runtime entry points ffdas still imports
+ * resolve exactly as before.
+ */
+FFDAS_1.0 {
+  global:
+    ffdas_*;
+  local:
+    *;
+};

@@ -51,12 +51,9 @@ _EXPECTED = {
         ("extraVoxelsX",      INT32),
         ("c0",                  FLOAT),
         ("tgcVector",           FLOAT),
-        ("delayIndices",        INT32),
-        ("interpolationWeights",CFLOAT),
-        ("frequencyAxis",       FLOAT),
-        ("planewaveDelays",     FLOAT),
         ("xAxis",              DOUBLE),
         ("zAxis",              DOUBLE),
+        ("beamformerType",      str),
     ],
     "PDISpec": [
         ("ensembleSize",        INT32),
@@ -86,7 +83,7 @@ def _cast(value, dtype):
 
 def _validate_and_cast(name: str, spec: dict) -> dict:
     """Check mandatory fields & cast each to the expected dtype."""
-    out = {}
+    out = dict(spec)
     for field, dtype in _EXPECTED[name]:
         if field not in spec:
             raise ValueError(f"{name}: missing field '{field}'")
@@ -107,6 +104,7 @@ def validate_specs(
     PDISpec: dict,
 ):
     ReceiveSpec["nElements"]         = ProbeSpec["nElements"]
+    ReconSpec.setdefault("beamformerType", "Fourier")
 
 
     """Replicates MATLAB echoframe_validate_structs in Python."""
@@ -117,8 +115,22 @@ def validate_specs(
     PDISpec     = _validate_and_cast("PDISpec",     PDISpec)
 
     ReconSpec["croppingROI"] = ReconSpec["croppingROI"].astype(np.int32).ravel(order='C')
-    ReconSpec["interpolationWeights"] = ReconSpec["interpolationWeights"].ravel(order='C')
-    ReconSpec["delayIndices"] = ReconSpec["delayIndices"].ravel(order='C')
+    if ReconSpec["beamformerType"].lower() == "das":
+        for key in ("dasChannelPositions", "dasVoxelPositions", "dasOffsets", "dasWeights"):
+            if key not in ReconSpec:
+                raise ValueError(f"ReconSpec: missing field '{key}'")
+            ReconSpec[key] = np.asarray(ReconSpec[key], dtype=FLOAT).ravel(order='C')
+        ReconSpec["dasWavenum"] = FLOAT(ReconSpec["dasWavenum"])
+        ReconSpec["dasAlgorithm"] = INT32(ReconSpec.get("dasAlgorithm", 1))
+        ReconSpec["dasComputeType"] = INT32(ReconSpec.get("dasComputeType", 0))
+        if "dasSourceDirections" in ReconSpec:
+            ReconSpec["dasSourceDirections"] = np.asarray(ReconSpec["dasSourceDirections"], dtype=FLOAT).ravel(order='C')
+    else:
+        for key, dtype in (("interpolationWeights", CFLOAT), ("delayIndices", INT32),
+                           ("frequencyAxis", FLOAT), ("planewaveDelays", FLOAT)):
+            if key not in ReconSpec:
+                raise ValueError(f"ReconSpec: missing field '{key}'")
+            ReconSpec[key] = np.asarray(ReconSpec[key], dtype=dtype).ravel(order='C')
     ReconSpec["xAxis"] = ReconSpec["xAxis"].ravel(order='C')
     ReconSpec["zAxis"] = ReconSpec["zAxis"].ravel(order='C')
 

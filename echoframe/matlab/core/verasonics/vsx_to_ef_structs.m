@@ -28,6 +28,11 @@ ProbeSpec.nElements       = Trans.numelements;
 ProbeSpec.pitch           = Trans.spacingMm / 1e3;  % distance between the transducers in x-direction [m]
 ProbeSpec.Fc               = Trans.frequency * 1e6;  % center frequency of the transducers [Hz]
 ProbeSpec.elementPosition = Trans.ElementPos; % in mm
+if isfield(Trans, 'ElementWidth')
+    ProbeSpec.elementWidth = Trans.ElementWidth / 1e3;
+elseif isfield(Trans, 'elementWidth')
+    ProbeSpec.elementWidth = Trans.elementWidth / 1e3;
+end
 
 %% TransmitSpec
 steer = [TX.Steer] * 180 / pi;

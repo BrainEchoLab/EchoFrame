@@ -77,6 +77,19 @@ static void validateFourierMatStruct(matvar_t *s) {
     validateField(s, "tgcVector");
 }
 
+static void validateDASMatStruct(matvar_t *s) {
+    validateField(s, "dasChannelPositions");
+    validateField(s, "dasVoxelPositions");
+    validateField(s, "dasOffsets");
+    validateField(s, "dasWeights");
+    validateField(s, "dasWavenum");
+}
+
+static bool hasField(matvar_t *s, const char *fld) {
+    matvar_t *f = Mat_VarGetStructFieldByName(s, fld, 0);
+    return f && f->data;
+}
+
 template <typename T>
 static T scalar(matvar_t *s, const char *fld) {
     matvar_t *f = Mat_VarGetStructFieldByName(s, fld, 0);
@@ -260,25 +273,57 @@ void loadSpecsFromMat(const std::string &matFile, EchoframeResources &res) {
     P.getPDI = scalar<uint8_t>(Pm.get(), "getPDI");
     P.cropBF = scalar<uint8_t>(Pm.get(), "cropBF");
     P.ensembleSize = R.nRepeats;
+    if (hasField(Pm.get(), "beamformerType")) {
+        std::string bf = str(Pm.get(), "beamformerType");
+        std::transform(bf.begin(), bf.end(), bf.begin(), ::tolower);
+        if (bf == "das") P.beamformerType = Beamform::BeamformerType::DAS;
+    }
 
-    validateFourierMatStruct(Pm.get());
+    if (P.beamformerType == Beamform::BeamformerType::DAS) {
+        validateDASMatStruct(Pm.get());
+        auto &DAS = res.dasReconSpec;
+        static auto channelPos = vec<float>(Pm.get(), "dasChannelPositions");
+        static auto voxelPos = vec<float>(Pm.get(), "dasVoxelPositions");
+        static auto offsets = vec<float>(Pm.get(), "dasOffsets");
+        static auto weights = vec<float>(Pm.get(), "dasWeights");
+        static auto tgc = vec<float>(Pm.get(), "tgcVector");
+        DAS.channelPositions = channelPos.data();
+        DAS.voxelPositions = voxelPos.data();
+        DAS.offsets = offsets.data();
+        DAS.weights = weights.data();
+        DAS.tgcVector = tgc.data();
+        DAS.wavenum = scalar<float>(Pm.get(), "dasWavenum");
+        DAS.algorithm = hasField(Pm.get(), "dasAlgorithm")
+                            ? scalar<int32_t>(Pm.get(), "dasAlgorithm")
+                            : 1;
+        DAS.computeType = hasField(Pm.get(), "dasComputeType")
+                              ? scalar<int32_t>(Pm.get(), "dasComputeType")
+                              : 0;
+        if (hasField(Pm.get(), "dasSourceDirections")) {
+            static auto sourceDirs = vec<float>(Pm.get(), "dasSourceDirections");
+            DAS.sourceDirections = sourceDirs.data();
+            DAS.useDirectivity = true;
+        }
+    } else {
+        validateFourierMatStruct(Pm.get());
 
-    auto &F = res.fourierReconSpec;
+        auto &F = res.fourierReconSpec;
 
-    static auto delayIdx = vecRowMajor<int32_t>(
-        Mat_VarGetStructFieldByName(Pm.get(), "delayIndices", 0));
+        static auto delayIdx = vecRowMajor<int32_t>(
+            Mat_VarGetStructFieldByName(Pm.get(), "delayIndices", 0));
 
-    static auto interpW = vecCplxRowMajor(
-        Mat_VarGetStructFieldByName(Pm.get(), "interpolationWeights", 0));
-    static auto freqAxis = vec<float>(Pm.get(), "frequencyAxis");
-    static auto pwDelays = vec<float>(Pm.get(), "planewaveDelays");
-    static auto tgc = vec<float>(Pm.get(), "tgcVector");
+        static auto interpW = vecCplxRowMajor(
+            Mat_VarGetStructFieldByName(Pm.get(), "interpolationWeights", 0));
+        static auto freqAxis = vec<float>(Pm.get(), "frequencyAxis");
+        static auto pwDelays = vec<float>(Pm.get(), "planewaveDelays");
+        static auto tgc = vec<float>(Pm.get(), "tgcVector");
 
-    F.delayIndices = delayIdx.data();
-    F.interpolationWeights = interpW.data();
-    F.frequencyAxis = freqAxis.data();
-    F.planewaveDelays = pwDelays.data();
-    F.tgcVector = tgc.data();
+        F.delayIndices = delayIdx.data();
+        F.interpolationWeights = interpW.data();
+        F.frequencyAxis = freqAxis.data();
+        F.planewaveDelays = pwDelays.data();
+        F.tgcVector = tgc.data();
+    }
 
     /* ------------ PDISpec ------------ */
     auto &D = res.pdiSpec;

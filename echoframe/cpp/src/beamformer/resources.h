@@ -21,6 +21,8 @@
 
 namespace Beamform {
 
+enum class BeamformerType : int32_t { Fourier = 0, DAS = 1 };
+
 /**
  * @brief Structure describing RF data acquisition and transducer properties.
  */
@@ -74,6 +76,7 @@ struct ReconSpec {
     bool getBF{false};              ///< Output beamformed data.
     bool getPDI{false};             ///< Output PDI data.
     bool cropBF{false};             ///< Crop beamformed data.
+    BeamformerType beamformerType{BeamformerType::Fourier};
 
     bool initialized{false};  ///< Initialization flag.
 };

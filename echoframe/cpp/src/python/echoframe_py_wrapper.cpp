@@ -57,6 +57,18 @@ static void bind_specs(py::module_ &m) {
         RW(Beamform::ReceiveSpec, nActiveChannels)
         .def_readwrite("initialized", &Beamform::ReceiveSpec::initialized);
 
+    py::enum_<Beamform::BeamformerType>(m, "BeamformerType")
+        .value("Fourier", Beamform::BeamformerType::Fourier)
+        .value("DAS", Beamform::BeamformerType::DAS);
+
+    py::class_<Beamform::FourierReconSpec>(m, "FourierReconSpec")
+        .def(py::init<>());
+    py::class_<Beamform::DASReconSpec>(m, "DASReconSpec")
+        .def(py::init<>()) RW(Beamform::DASReconSpec, wavenum)
+            RW(Beamform::DASReconSpec, algorithm)
+                RW(Beamform::DASReconSpec, computeType)
+                    RW(Beamform::DASReconSpec, useDirectivity);
+
     /* ---- ReconSpec ------------------------------------------------------ */
     py::class_<Beamform::ReconSpec>(m, "ReconSpec")
         .def(py::init<>())
@@ -78,6 +90,7 @@ static void bind_specs(py::module_ &m) {
         /* behaviour flags */
         RW(Beamform::ReconSpec, filterFrequencies)
             RW(Beamform::ReconSpec, getBF) RW(Beamform::ReconSpec, getPDI)
+                RW(Beamform::ReconSpec, beamformerType)
 
         .def_readwrite("initialized", &Beamform::ReconSpec::initialized);
 }
@@ -156,7 +169,8 @@ PYBIND11_MODULE(echoframe, m) {
         .def_readwrite("rfTimeTagStorageSpec",
                        &EchoframeResources::rfTimeTagStorageSpec)
         .def_readwrite("fourierReconSpec",
-                       &EchoframeResources::fourierReconSpec);
+                       &EchoframeResources::fourierReconSpec)
+        .def_readwrite("dasReconSpec", &EchoframeResources::dasReconSpec);
 
     py::class_<EchoFrameWrapper>(m, "EchoFrame")
         .def(py::init<const EchoframeResources &, bool>(), py::arg("resources"),
