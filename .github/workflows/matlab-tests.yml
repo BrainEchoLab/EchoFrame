@@ -30,7 +30,8 @@ concurrency:
 
 jobs:
   headless:
-    runs-on: ubuntu-latest
+    # Pinned: MATLAB R2024a supports Ubuntu up to 22.04, and setup-matlab refuses newer.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
