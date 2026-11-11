@@ -24,57 +24,9 @@
 #include <string>
 
 #include "../error.h"
+#include "linux_statx.h"
 
 namespace Storage {
-
-// The kernel's statx layout, transcribed. glibc's struct statx and
-// <linux/stat.h> cannot be included together (same tag, different members),
-// and neither reliably declares stx_dio_mem_align/stx_dio_offset_align. The
-// raw syscall is used rather than glibc's wrapper, which is typed against
-// glibc's own struct.
-namespace {
-
-struct EfStatxTimestamp {
-    int64_t tv_sec;
-    uint32_t tv_nsec;
-    int32_t __reserved;
-};
-
-struct EfStatx {
-    uint32_t stx_mask;
-    uint32_t stx_blksize;
-    uint64_t stx_attributes;
-    uint32_t stx_nlink;
-    uint32_t stx_uid;
-    uint32_t stx_gid;
-    uint16_t stx_mode;
-    uint16_t __spare0[1];
-    uint64_t stx_ino;
-    uint64_t stx_size;
-    uint64_t stx_blocks;
-    uint64_t stx_attributes_mask;
-    EfStatxTimestamp stx_atime;
-    EfStatxTimestamp stx_btime;
-    EfStatxTimestamp stx_ctime;
-    EfStatxTimestamp stx_mtime;
-    uint32_t stx_rdev_major;
-    uint32_t stx_rdev_minor;
-    uint32_t stx_dev_major;
-    uint32_t stx_dev_minor;
-    uint64_t stx_mnt_id;
-    uint32_t stx_dio_mem_align;
-    uint32_t stx_dio_offset_align;
-    uint64_t __spare3[12];  // reserved space for fields added after these
-};
-
-// statx(2) takes no buffer-length argument: the kernel always writes a fixed
-// 256-byte struct. A smaller struct here would be overflowed by the syscall.
-static_assert(sizeof(EfStatx) == 256, "EfStatx must match the kernel's fixed statx(2) ABI size");
-
-constexpr uint32_t kEfStatxDioalign = 0x00002000U;    // STATX_DIOALIGN
-constexpr uint32_t kEfStatxBasicStats = 0x000007ffU;  // STATX_BASIC_STATS (covers stx_blksize)
-
-}  // namespace
 
 // ---------------------------------------------------------------------------
 // Constructor
@@ -315,41 +267,35 @@ void LinuxFileIO<bufferType_t>::extendFile(int nBuffers) {
 // Block layout
 // ---------------------------------------------------------------------------
 
-// Query the file's O_DIRECT alignment via statx(STATX_DIOALIGN). Offset/length
-// alignment (stx_dio_offset_align) and buffer-address alignment
-// (stx_dio_mem_align) are reported separately and are not guaranteed equal.
-// Throws if either is unavailable -- a kernel without STATX_DIOALIGN, or a
-// filesystem that accepts O_DIRECT without enforcing alignment (e.g. tmpfs).
+// Query the file's O_DIRECT alignment via statx(STATX_DIOALIGN) and store it.
+// A kernel that does not report the query falls back to a conservative
+// page-sized alignment (resolveDioAlignment) and warns. Throws if the
+// filesystem reports the query but zeroes either value, i.e. accepts O_DIRECT
+// without enforcing alignment (e.g. tmpfs).
 template <typename bufferType_t>
 void LinuxFileIO<bufferType_t>::queryAlignment() {
-    EfStatx stx {};
+    detail::EfStatx stx {};
     if (syscall(SYS_statx, mFd, "", AT_EMPTY_PATH,
-                kEfStatxDioalign | kEfStatxBasicStats, &stx) != 0)
+                detail::kEfStatxDioalign | detail::kEfStatxBasicStats,
+                &stx) != 0)
         throw storageException(
             std::string("queryAlignment: statx failed: ") + strerror(errno) +
             "\n");
-    if (!(stx.stx_mask & kEfStatxDioalign))
-        throw storageException(
-            "queryAlignment: kernel does not report STATX_DIOALIGN "
-            "(requires Linux 6.1+)\n");
-    if (stx.stx_dio_offset_align == 0 || stx.stx_dio_mem_align == 0)
+
+    const detail::DioAlignment align = detail::resolveDioAlignment(stx);
+    if (!align.reported && logAtLeast(kLogNormal))
+        std::cerr << "queryAlignment: kernel does not report STATX_DIOALIGN; "
+                     "using conservative "
+                  << align.sectorSize << "-byte O_DIRECT alignment.\n";
+    if (align.sectorSize == 0 || align.memAlign == 0)
         throw storageException(
             "queryAlignment: filesystem does not support/enforce O_DIRECT "
             "alignment (dio_offset_align/dio_mem_align reported as 0 -- "
             "direct I/O is not actually honored on this filesystem, e.g. "
             "tmpfs)\n");
 
-    // dio_offset_align is only the required minimum: on a 512e drive (512 B
-    // logical, 4096 B physical) it is 512, and writing at that alignment forces
-    // a device-side read-modify-write per block. Prefer stx_blksize (typically
-    // the physical sector) when it is a whole multiple of dio_offset_align, so
-    // writes land on physical-sector boundaries; fall back to dio_offset_align.
-    mSectorSize = stx.stx_dio_offset_align;
-    if ((stx.stx_mask & kEfStatxBasicStats) && stx.stx_blksize > mSectorSize &&
-        stx.stx_blksize % stx.stx_dio_offset_align == 0) {
-        mSectorSize = stx.stx_blksize;
-    }
-    mMemAlign = stx.stx_dio_mem_align;
+    mSectorSize = align.sectorSize;
+    mMemAlign = align.memAlign;
 
     mHeaderSize = computeHeaderSize();
 }

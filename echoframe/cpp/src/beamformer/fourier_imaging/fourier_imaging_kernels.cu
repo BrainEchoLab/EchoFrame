@@ -166,12 +166,13 @@ __global__ void interpFastTimeCompoundAndPad_kernel(
     ind2subV2(sub, idx, stridesInds, nDim);
 
     // padding
-    // put the zero-padding in the middle of the frequency field
-    // this is needed for the IFFT later
-    int xBounds = (nz - receiveSpec.nFastTimeSamples) / 2;
-    int x = (sub[0] < xBounds) ? sub[0] : sub[0] + xBounds * 2;
-    int zBounds = (nx - receiveSpec.nChannels) / 2;
-    int z = (sub[1] < zBounds) ? sub[1] : sub[1] + zBounds * 2;
+    // put the zero-padding at the wrap point of the (DC-first) frequency
+    // field, after the non-negative half, so the IFFT interpolates.
+    int zSplit = (receiveSpec.nFastTimeSamples + 1) / 2;
+    int x = (sub[0] < zSplit) ? sub[0]
+                              : sub[0] + (nz - receiveSpec.nFastTimeSamples);
+    int xSplit = (receiveSpec.nChannels + 1) / 2;
+    int z = (sub[1] < xSplit) ? sub[1] : sub[1] + (nx - receiveSpec.nChannels);
 
     float2 compoundSample{0, 0};
     for (gsl::index i = 0; i < receiveSpec.nTX; i++) {

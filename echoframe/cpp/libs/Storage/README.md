@@ -27,7 +27,10 @@ than plain synchronous writes:
   buffers and the header are sector-size aligned (padding is added when a buffer
   is not a multiple of the sector size, and recorded in the header). The
   alignment is queried at open time — `queryAlignment()` — from the physical
-  sector size on Windows and from `statx(STATX_DIOALIGN)` on Linux.
+  sector size on Windows and from `statx(STATX_DIOALIGN)` on Linux. A Linux
+  kernel that does not report `STATX_DIOALIGN` (pre-6.1, or a filesystem that
+  does not implement the query) falls back to a conservative page-sized
+  alignment and logs a warning.
 - **Preallocation + privileged extension** — with `preallocateFullFile` the file
   is sized up front. On Windows extension uses `SE_MANAGE_VOLUME_NAME`
   (`SeManageVolumePrivilege`) to grow files without zero-filling; on Linux it

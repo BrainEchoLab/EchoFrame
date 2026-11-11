@@ -4,9 +4,10 @@
 //
 // The sector size used for offset/length rounding (adjustToSectorSize()) and
 // the buffer-address alignment O_DIRECT requires are queried at runtime via
-// statx(STATX_DIOALIGN) in queryAlignment(); the constructor throws if the
-// kernel/filesystem can't report a real value. The file header
-// (writeToHeader()) is allocated against these queried values.
+// statx(STATX_DIOALIGN) in queryAlignment(); a kernel that does not report it
+// falls back to a conservative page-sized alignment, and the constructor throws
+// only if the filesystem reports the query but does not enforce alignment. The
+// file header (writeToHeader()) is allocated against these queried values.
 //
 
 #ifndef CUBE_STORAGE_LINUXFILEIO_H
@@ -44,7 +45,9 @@ class LinuxFileIO {
     /**
      * @brief Query the file's actual O_DIRECT offset/length alignment
      * (mSectorSize) and buffer-address alignment (mMemAlign) via
-     * statx(STATX_DIOALIGN). Throws if either value can't be determined.
+     * statx(STATX_DIOALIGN). Falls back to the page size for both when the
+     * kernel does not report the query. Throws if the filesystem reports it but
+     * does not enforce alignment.
      */
     void queryAlignment();
 
@@ -80,8 +83,8 @@ class LinuxFileIO {
     std::vector<uint64_t> mBlockOffset;  // element offset into buffer for each block
 
     // O_DIRECT alignment requirements. Set by queryAlignment(), called
-    // early in the constructor (which throws if either can't be
-    // determined) -- never read at their zero-initialized value.
+    // early in the constructor, which either resolves them or throws --
+    // never read at their zero-initialized value.
     uint64_t mSectorSize{0};  // required offset/length alignment
     uint64_t mMemAlign{0};    // required buffer-address alignment
 

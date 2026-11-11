@@ -14,7 +14,7 @@ function [Resource, Trans, TransmitSpec, ReceiveSpec] = get_system_parameters(Re
 %
 %    nChannels             128 or 256, from Resource.Parameters.numRcvChannels
 %                          and Trans.numelements
-%    Fs                    Trans.frequency * 4 (Hz)
+%    Fs                    pre-quadrature sample rate: 4*Fc, or 4*Fc/3 for BS67BW (Hz)
 %    samplesPerWavelength  from samplingMode: 1 (BS50BW), 4/3 (BS67BW),
 %                          2 (BS100BW), 4 (NS200BW)
 %
@@ -52,6 +52,7 @@ switch ReceiveSpec.samplingMode
     case 'BS50BW'
         ReceiveSpec.samplesPerWavelength = 1;
     case 'BS67BW'
+        ReceiveSpec.Fs = Trans.frequency * (4/3) * 1e6;
         ReceiveSpec.samplesPerWavelength = 4/3;
     case 'BS100BW'
         ReceiveSpec.samplesPerWavelength = 2;

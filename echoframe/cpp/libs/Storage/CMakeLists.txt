@@ -49,8 +49,11 @@ endif ()
 #                    with and without the deferred-write knob. Drives a real
 #                    Handler through a real file, which is where the counting
 #                    lives, so this one needs elevation on Windows.
+# linux_alignment_check  how a statx(STATX_DIOALIGN) result becomes the O_DIRECT
+#                    offset/length and buffer-address alignments, including the
+#                    no-STATX_DIOALIGN fallback. Linux only; no file I/O.
 #
-# Both exit non-zero on failure.
+# All exit non-zero on failure.
 include(CTest)
 
 foreach (check write_stats_check write_count_check)
@@ -58,3 +61,9 @@ foreach (check write_stats_check write_count_check)
     target_link_libraries(${check} PRIVATE echoframe_storage)
     add_test(NAME ${check} COMMAND ${check})
 endforeach ()
+
+if (NOT WIN32)
+    add_executable(linux_alignment_check tests/linux_alignment_check.cpp)
+    target_link_libraries(linux_alignment_check PRIVATE echoframe_storage)
+    add_test(NAME linux_alignment_check COMMAND linux_alignment_check)
+endif ()
